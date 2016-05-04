@@ -101,7 +101,7 @@ public final class OnboardingUtils {
         ContentResolver resolver = context.getContentResolver();
         try (Cursor c = resolver.query(Channels.CONTENT_URI, new String[] {Channels._ID}, null,
                 null, null)) {
-            return c.getCount() != 0;
+            return c != null && c.getCount() != 0;
         }
     }
 
