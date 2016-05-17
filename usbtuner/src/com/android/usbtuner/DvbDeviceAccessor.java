@@ -34,9 +34,6 @@ import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.common.recording.RecordingCapability;
 import com.android.usbtuner.tvinput.UsbTunerTvInputService;
 
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.InvocationTargetException;
@@ -146,17 +143,12 @@ public class DvbDeviceAccessor {
         List<DvbDeviceInfoWrapper> deviceList = getDvbDeviceList();
         TvInputInfo.Builder builder = new TvInputInfo.Builder(context, new ComponentName(context,
                         UsbTunerTvInputService.class));
-        try {
-            if (deviceList.size() > 0) {
-                return builder.setCanRecord(
-                        CommonFeatures.DVR.isEnabled(context) && BuildCompat.isAtLeastN())
-                        .setTunerCount(deviceList.size())
-                        .build();
-            } else {
-                return null;
-            }
-        } catch (IOException | XmlPullParserException e) {
-            SoftPreconditions.warn(TAG, null, "Failed to update TvInputInfo", e);
+        if (deviceList.size() > 0) {
+            return builder.setCanRecord(
+                    CommonFeatures.DVR.isEnabled(context) && BuildCompat.isAtLeastN())
+                    .setTunerCount(deviceList.size())
+                    .build();
+        } else {
             return null;
         }
     }
