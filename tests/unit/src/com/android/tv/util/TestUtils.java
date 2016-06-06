@@ -36,7 +36,7 @@ public class TestUtils {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             return createTvInputInfoForLmp(service, id, parentId, type);
         } else if (BuildCompat.isAtLeastN()) {
-            new RuntimeException("TOOD(dvr): implement");  // http://b/26903987
+            throw new RuntimeException("TODO(dvr): implement");  // http://b/26903987
         }
         return createTvInputInfoForMnc(service, id, parentId, type, isHardwareInput);
     }
