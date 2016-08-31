@@ -16,7 +16,6 @@
 
 package com.android.tv.common.feature;
 
-import static com.android.tv.common.feature.EngOnlyFeature.ENG_ONLY_FEATURE;
 import static com.android.tv.common.feature.FeatureUtils.OR;
 import static com.android.tv.common.feature.TestableFeature.createTestableFeature;
 
@@ -30,14 +29,28 @@ public class CommonFeatures {
      * DVR
      *
      * <p>See <a href="https://goto.google.com/atv-dvr-onepager">go/atv-dvr-onepager</a>
+     *
+     * DVR API is introduced in N.
+     *
+     * STOPSHIP: Double-check of DVR is a part of the release before launching.
      */
-    public static TestableFeature DVR = createTestableFeature(
-            OR(ENG_ONLY_FEATURE, Sdk.N_PRE_2_OR_HIGHER));
+    public static final TestableFeature DVR =
+            createTestableFeature(OR(Sdk.N_PRE_2_OR_HIGHER, Sdk.AT_LEAST_N));
+
+    /**
+     * ENABLE_RECORDING_REGARDLESS_OF_STORAGE_STATUS
+     *
+     * Enables dvr recording regardless of storage status.
+     */
+    public static final Feature FORCE_RECORDING_UNTIL_NO_SPACE =
+            new PropertyFeature("force_recording_until_no_space", false);
 
     /**
      * USE_SW_CODEC_FOR_SD
      *
      * Prefer software based codec for SD channels.
      */
-    public static Feature USE_SW_CODEC_FOR_SD = new PropertyFeature("use_sw_codec_for_sd", true);
+    public static final Feature USE_SW_CODEC_FOR_SD =
+            new PropertyFeature("use_sw_codec_for_sd", false
+            );
 }

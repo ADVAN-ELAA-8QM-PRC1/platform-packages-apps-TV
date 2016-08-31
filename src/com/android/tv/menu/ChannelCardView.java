@@ -103,12 +103,7 @@ public class ChannelCardView extends BaseCardView<Channel> {
         }
         mChannel = channel;
         mProgram = null;
-        if (TextUtils.isEmpty(mChannel.getDisplayName())) {
-            mChannelNumberNameView.setText(mChannel.getDisplayNumber());
-        } else {
-            mChannelNumberNameView.setText(mChannel.getDisplayNumber() + " "
-                    + mChannel.getDisplayName());
-        }
+        mChannelNumberNameView.setText(mChannel.getDisplayText());
         mChannelNumberNameView.setVisibility(VISIBLE);
         mImageView.setImageResource(R.drawable.ic_recent_thumbnail_default);
         mImageView.setBackgroundResource(R.color.channel_card);

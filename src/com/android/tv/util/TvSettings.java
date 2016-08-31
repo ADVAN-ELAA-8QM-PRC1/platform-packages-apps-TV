@@ -225,7 +225,7 @@ public final class TvSettings {
 
     private static Set<String> getContentRatingSystemSet(Context context) {
         return new HashSet<>(PreferenceManager.getDefaultSharedPreferences(context)
-                .getStringSet(PREF_CONTENT_RATING_SYSTEMS, Collections.<String>emptySet()));
+                .getStringSet(PREF_CONTENT_RATING_SYSTEMS, Collections.emptySet()));
     }
 
     @ContentRatingLevel

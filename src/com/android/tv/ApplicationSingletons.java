@@ -18,11 +18,14 @@ package com.android.tv;
 
 import com.android.tv.analytics.Analytics;
 import com.android.tv.analytics.Tracker;
+import com.android.tv.config.RemoteConfig;
 import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.ProgramDataManager;
 import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrManager;
-import com.android.tv.dvr.DvrSessionManager;
+import com.android.tv.dvr.DvrScheduleManager;
+import com.android.tv.dvr.DvrWatchedPositionManager;
+import com.android.tv.util.AccountHelper;
 import com.android.tv.util.TvInputManagerHelper;
 
 /**
@@ -36,9 +39,13 @@ public interface ApplicationSingletons {
 
     DvrDataManager getDvrDataManager();
 
+    DvrScheduleManager getDvrScheduleManager();
+
     DvrManager getDvrManager();
 
-    DvrSessionManager getDvrSessionManger();
+    DvrWatchedPositionManager getDvrWatchedPositionManager();
+
+    InputSessionManager getInputSessionManager();
 
     ProgramDataManager getProgramDataManager();
 
@@ -47,4 +54,8 @@ public interface ApplicationSingletons {
     TvInputManagerHelper getTvInputManagerHelper();
 
     MainActivityWrapper getMainActivityWrapper();
+
+    AccountHelper getAccountHelper();
+
+    RemoteConfig getRemoteConfig();
 }

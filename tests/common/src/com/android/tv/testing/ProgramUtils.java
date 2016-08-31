@@ -66,8 +66,12 @@ public class ProgramUtils {
             ProgramInfo programAt = program.build(context, index++);
             values.put(Programs.COLUMN_TITLE, programAt.title);
             values.put(Programs.COLUMN_EPISODE_TITLE, programAt.episode);
-            values.put(Programs.COLUMN_SEASON_NUMBER, programAt.seasonNumber);
-            values.put(Programs.COLUMN_EPISODE_NUMBER, programAt.episodeNumber);
+            if (programAt.seasonNumber != 0) {
+                values.put(Programs.COLUMN_SEASON_NUMBER, programAt.seasonNumber);
+            }
+            if (programAt.episodeNumber != 0) {
+                values.put(Programs.COLUMN_EPISODE_NUMBER, programAt.episodeNumber);
+            }
             values.put(Programs.COLUMN_POSTER_ART_URI, programAt.posterArtUri);
             values.put(Programs.COLUMN_START_TIME_UTC_MILLIS, timeMs);
             values.put(Programs.COLUMN_END_TIME_UTC_MILLIS, timeMs + programAt.durationMs);

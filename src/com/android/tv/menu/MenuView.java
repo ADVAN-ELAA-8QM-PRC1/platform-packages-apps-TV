@@ -89,6 +89,7 @@ public class MenuView extends FrameLayout implements IMenuView {
     private MenuRowView createMenuRowView(MenuRow row) {
         MenuRowView view = (MenuRowView) mLayoutInflater.inflate(row.getLayoutResId(), this, false);
         view.onBind(row);
+        row.setMenuRowView(view);
         return view;
     }
 
@@ -160,6 +161,19 @@ public class MenuView extends FrameLayout implements IMenuView {
     }
 
     @Override
+    public boolean update(String rowId, boolean menuActive) {
+        if (menuActive) {
+            MenuRow row = getMenuRow(rowId);
+            if (row != null) {
+                row.update();
+                mLayoutManager.onMenuRowUpdated();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     protected boolean onRequestFocusInDescendants(int direction, Rect previouslyFocusedRect) {
         int selectedPosition = mLayoutManager.getSelectedPosition();
         // When the menu shows up, the selected row should have focus.
@@ -181,6 +195,15 @@ public class MenuView extends FrameLayout implements IMenuView {
         for (MenuRowView view : mMenuRowViews) {
             view.initialize(mShowReason);
         }
+    }
+
+    private MenuRow getMenuRow(String rowId) {
+        for (MenuRow item : mMenuRows) {
+            if (rowId.equals(item.getId())) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private int getItemPosition(String rowIdToSelect) {

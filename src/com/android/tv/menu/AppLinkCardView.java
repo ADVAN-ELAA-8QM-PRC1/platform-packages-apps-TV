@@ -40,7 +40,6 @@ import com.android.tv.data.Channel;
 import com.android.tv.util.BitmapUtils;
 import com.android.tv.util.ImageLoader;
 import com.android.tv.util.TvInputManagerHelper;
-import com.android.tv.util.Utils;
 
 /**
  * A view to render an app link card.
@@ -97,7 +96,7 @@ public class AppLinkCardView extends BaseCardView<Channel> {
                 R.dimen.card_meta_layout_height);
         mExtendedTextViewCardHeight = getResources().getDimensionPixelOffset(
                 R.dimen.card_meta_layout_height_extended);
-        mIconColorFilter = Utils.getColor(getResources(), R.color.app_link_card_icon_color_filter);
+        mIconColorFilter = getResources().getColor(R.color.app_link_card_icon_color_filter, null);
     }
 
     /**
@@ -302,7 +301,7 @@ public class AppLinkCardView extends BaseCardView<Channel> {
             @Override
             public void onGenerated(Palette palette) {
                 mMetaViewHolder.setBackgroundColor(palette.getDarkVibrantColor(
-                        Utils.getColor(getResources(), R.color.channel_card_meta_background)));
+                        getResources().getColor(R.color.channel_card_meta_background, null)));
             }
         });
     }

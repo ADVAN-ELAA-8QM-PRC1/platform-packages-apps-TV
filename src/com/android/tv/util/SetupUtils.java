@@ -23,7 +23,6 @@ import android.content.SharedPreferences;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
-import android.os.Build;
 import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.annotation.UiThread;
@@ -36,6 +35,7 @@ import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
+import com.android.tv.tuner.tvinput.TunerTvInputService;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -64,23 +64,23 @@ public class SetupUtils {
     private final Set<String> mSetUpInputs;
     private final Set<String> mRecognizedInputs;
     private boolean mIsFirstTune;
-    private final String mUsbTunerInputId;
+    private final String mTunerInputId;
 
     private SetupUtils(TvApplication tvApplication) {
         mTvApplication = tvApplication;
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(tvApplication);
         mSetUpInputs = new ArraySet<>();
         mSetUpInputs.addAll(mSharedPreferences.getStringSet(PREF_KEY_SET_UP_INPUTS,
-                Collections.<String>emptySet()));
+                Collections.emptySet()));
         mKnownInputs = new ArraySet<>();
         mKnownInputs.addAll(mSharedPreferences.getStringSet(PREF_KEY_KNOWN_INPUTS,
-                Collections.<String>emptySet()));
+                Collections.emptySet()));
         mRecognizedInputs = new ArraySet<>();
         mRecognizedInputs.addAll(mSharedPreferences.getStringSet(PREF_KEY_RECOGNIZED_INPUTS,
                 mKnownInputs));
         mIsFirstTune = mSharedPreferences.getBoolean(PREF_KEY_IS_FIRST_TUNE, true);
-        mUsbTunerInputId = TvContract.buildInputId(new ComponentName(tvApplication,
-                com.android.usbtuner.tvinput.UsbTunerTvInputService.class));
+        mTunerInputId = TvContract.buildInputId(new ComponentName(tvApplication,
+                TunerTvInputService.class));
     }
 
     /**
@@ -264,15 +264,10 @@ public class SetupUtils {
      * @param context The Context used for granting permission.
      */
     public static void grantEpgPermissionToSetUpPackages(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            // Can't grant permission.
-            return;
-        }
-
         // Find all already-verified packages.
         Set<String> setUpPackages = new HashSet<>();
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
-        for (String input : sp.getStringSet(PREF_KEY_SET_UP_INPUTS, Collections.<String>emptySet())) {
+        for (String input : sp.getStringSet(PREF_KEY_SET_UP_INPUTS, Collections.EMPTY_SET)) {
             if (!TextUtils.isEmpty(input)) {
                 ComponentName componentName = ComponentName.unflattenFromString(input);
                 if (componentName != null) {
@@ -293,21 +288,18 @@ public class SetupUtils {
      * @param packageName The name of the package to give permission.
      */
     public static void grantEpgPermission(Context context, String packageName) {
-        // TvProvider allows granting of Uri permissions starting from MNC.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (DEBUG) {
-                Log.d(TAG, "grantEpgPermission(context=" + context + ", packageName=" + packageName
-                        + ")");
-            }
-            try {
-                int modeFlags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                        | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
-                context.grantUriPermission(packageName, TvContract.Channels.CONTENT_URI, modeFlags);
-                context.grantUriPermission(packageName, TvContract.Programs.CONTENT_URI, modeFlags);
-            } catch (SecurityException e) {
-                Log.e(TAG, "Either TvProvider does not allow granting of Uri permissions or the app"
-                        + " does not have permission.", e);
-            }
+        if (DEBUG) {
+            Log.d(TAG, "grantEpgPermission(context=" + context + ", packageName=" + packageName
+                    + ")");
+        }
+        try {
+            int modeFlags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
+            context.grantUriPermission(packageName, TvContract.Channels.CONTENT_URI, modeFlags);
+            context.grantUriPermission(packageName, TvContract.Programs.CONTENT_URI, modeFlags);
+        } catch (SecurityException e) {
+            Log.e(TAG, "Either TvProvider does not allow granting of Uri permissions or the app"
+                    + " does not have permission.", e);
         }
     }
 
@@ -335,7 +327,7 @@ public class SetupUtils {
         // A USB tuner device can be temporarily unplugged. We do not remove the USB tuner input
         // from the known inputs so that the input won't appear as a new input whenever the user
         // plugs in the USB tuner device again.
-        removedInputList.remove(mUsbTunerInputId);
+        removedInputList.remove(mTunerInputId);
 
         if (!removedInputList.isEmpty()) {
             for (String input : removedInputList) {
