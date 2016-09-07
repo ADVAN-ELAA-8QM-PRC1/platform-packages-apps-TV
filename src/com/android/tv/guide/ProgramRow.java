@@ -84,6 +84,15 @@ public class ProgramRow extends TimelineGridView {
     }
 
     @Override
+    public void onViewAdded(View child) {
+        super.onViewAdded(child);
+        ProgramItemView itemView = (ProgramItemView) child;
+        if (getLeft() <= itemView.getRight() && itemView.getLeft() <= getRight()) {
+            itemView.updateVisibleArea();
+        }
+    }
+
+    @Override
     public void onScrolled(int dx, int dy) {
         super.onScrolled(dx, dy);
         int childCount = getChildCount();
@@ -95,8 +104,7 @@ public class ProgramRow extends TimelineGridView {
         for (int i = 0; i < childCount; ++i) {
             ProgramItemView child = (ProgramItemView) getChildAt(i);
             if (getLeft() <= child.getRight() && child.getLeft() <= getRight()) {
-                child.layoutVisibleArea(getLayoutDirection() == LAYOUT_DIRECTION_LTR
-                        ? getLeft() - child.getLeft() : child.getRight() - getRight());
+                child.updateVisibleArea();
             }
         }
     }
@@ -160,7 +168,7 @@ public class ProgramRow extends TimelineGridView {
                 return focused;
             }
         } else if (isDirectionEnd(direction) || direction == View.FOCUS_FORWARD) {
-            if (focusedEntry.entryEndUtcMillis > toMillis + ONE_HOUR_MILLIS) {
+            if (focusedEntry.entryEndUtcMillis >= toMillis + ONE_HOUR_MILLIS) {
                 // The current entry ends outside of the view; Scroll to the right.
                 scrollByTime(ONE_HOUR_MILLIS);
                 return focused;
@@ -172,7 +180,7 @@ public class ProgramRow extends TimelineGridView {
             if (isDirectionEnd(direction) || direction == View.FOCUS_FORWARD) {
                 if (focusedEntry.entryEndUtcMillis != toMillis) {
                     // The focused entry is the last entry; Align to the right edge.
-                    scrollByTime(focusedEntry.entryEndUtcMillis - mProgramManager.getToUtcMillis());
+                    scrollByTime(focusedEntry.entryEndUtcMillis - toMillis);
                     return focused;
                 }
             }

@@ -16,7 +16,6 @@
 
 package com.android.tv.ui.sidepanel;
 
-import android.app.Activity;
 import android.app.Fragment;
 import android.content.Context;
 import android.graphics.drawable.RippleDrawable;
@@ -80,11 +79,11 @@ public abstract class SideFragment extends Fragment implements HasTrackerLabel {
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
+    public void onAttach(Context context) {
+        super.onAttach(context);
         mChannelDataManager = getMainActivity().getChannelDataManager();
         mProgramDataManager = getMainActivity().getProgramDataManager();
-        mTracker = TvApplication.getSingletons(activity).getTracker();
+        mTracker = TvApplication.getSingletons(context).getTracker();
     }
 
     @Override

@@ -74,6 +74,9 @@ public abstract class SetupGuidedStepFragment extends GuidedStepFragment {
         }
         // gridView Alignment
         VerticalGridView gridView = getGuidedActionsStylist().getActionsGridView();
+        // Workaround of b/28274171
+        // TODO: Remove the following line once b/28274171 is resolved.
+        gridView.setFocusable(true);
         int offset = getResources().getDimensionPixelOffset(
                 R.dimen.setup_guidedactions_selector_margin_top);
         gridView.setWindowAlignmentOffset(offset);

@@ -18,6 +18,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.android.tv" xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.GLOBAL_SEARCH" tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.INTERNET" />
@@ -111,6 +112,23 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.Leanback.Browse" />
 
+        <activity android:name=".dvr.DvrPlaybackActivity"
+            android:configChanges="keyboard|keyboardHidden|screenSize|smallestScreenSize|screenLayout|orientation"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.Leanback" />
+
+        <activity android:name=".dvr.ui.DvrDetailsActivity"
+            android:theme="@style/Theme.TV.Dvr.Browse.Details" />
+
+        <activity android:name=".dvr.ui.DvrSeriesSettingsActivity"
+            android:theme="@style/Theme.TV.Dvr.Settings.GuidedStep" />
+
+        <activity android:name=".dvr.ui.DvrSeriesDeletionActivity"
+            android:theme="@style/Theme.TV.Dvr.Series.Deletion.GuidedStep" />
+
+        <activity android:name=".dvr.ui.DvrSchedulesActivity"
+            android:theme="@style/Theme.Leanback.Details" />
+
         <provider android:name="com.android.tv.search.LocalSearchProvider"
             android:authorities="com.android.tv.search"
             android:exported="true"
@@ -153,20 +171,20 @@
         </receiver>
 
         <!-- USB tuner components definition -->
-        <activity android:name="com.android.usbtuner.setup.TunerSetupActivity"
-            android:label="@string/ut_app_name"
+        <activity android:name="com.android.tv.tuner.setup.TunerSetupActivity"
+            android:label="@string/bt_app_name"
             android:launchMode="singleInstance"
-            android:process="com.android.usbtuner"
+            android:process="com.android.tv.tuner"
             android:theme="@style/Theme.Setup.GuidedStep" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
         </activity>
-        <activity android:name=".dvr.DvrPlayActivity"/>
-        <service android:name="com.android.usbtuner.tvinput.UsbTunerTvInputService"
+
+        <service android:name=".tuner.tvinput.TunerTvInputService"
             android:enabled="false"
-            android:process="com.android.usbtuner"
-            android:label="@string/ut_app_name"
+            android:process="com.android.tv.tuner"
+            android:label="@string/bt_app_name"
             android:permission="android.permission.BIND_TV_INPUT" >
             <intent-filter>
                 <action android:name="android.media.tv.TvInputService" />
@@ -174,17 +192,18 @@
             <meta-data android:name="android.media.tv.input"
                 android:resource="@xml/ut_tvinputservice" />
         </service>
-        <provider android:name="com.android.usbtuner.UsbTunerPreferenceProvider"
-            android:authorities="com.android.usbtuner.preferences"
-            android:process="com.android.usbtuner"
+        <provider android:name=".tuner.TunerPreferenceProvider"
+            android:authorities="com.android.tv.tuner.preferences"
+            android:process="com.android.tv.tuner"
             android:exported="false" />
-        <!-- UsbInputController should be the same process with MainActivity to check status of MainActivity -->
-        <receiver android:name="com.android.usbtuner.UsbInputController"
+        <!-- TunerInputController should be the same process with MainActivity to check status of MainActivity -->
+        <receiver android:name=".tuner.TunerInputController"
             android:exported="false">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
                 <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
+                <action android:name="com.android.tv.action.APPLICATION_FIRST_LAUNCHED" />
             </intent-filter>
         </receiver>
 

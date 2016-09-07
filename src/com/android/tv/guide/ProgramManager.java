@@ -27,6 +27,8 @@ import com.android.tv.data.GenreItems;
 import com.android.tv.data.Program;
 import com.android.tv.data.ProgramDataManager;
 import com.android.tv.dvr.DvrDataManager;
+import com.android.tv.dvr.DvrScheduleManager;
+import com.android.tv.dvr.DvrScheduleManager.OnConflictStateChangeListener;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.util.TvInputManagerHelper;
 import com.android.tv.util.Utils;
@@ -59,12 +61,12 @@ public class ProgramManager {
     private final ChannelDataManager mChannelDataManager;
     private final ProgramDataManager mProgramDataManager;
     private final DvrDataManager mDvrDataManager;  // Only set if DVR is enabled
+    private final DvrScheduleManager mDvrScheduleManager;
 
     private long mStartUtcMillis;
     private long mEndUtcMillis;
     private long mFromUtcMillis;
     private long mToUtcMillis;
-    private Program mSelectedProgram;
 
     /**
      * Entry for program guide table. An "entry" can be either an actual program or a gap between
@@ -177,16 +179,31 @@ public class ProgramManager {
     // Channel list after applying genre filter.
     // Should be matched with mSelectedGenreId always.
     private List<Channel> mFilteredChannels = mChannels;
+    private boolean mChannelDataLoaded;
 
     private final Set<Listener> mListeners = new ArraySet<>();
     private final Set<TableEntriesUpdatedListener> mTableEntriesUpdatedListeners = new ArraySet<>();
 
     private final Set<TableEntryChangedListener> mTableEntryChangedListeners = new ArraySet<>();
 
+    private final DvrDataManager.OnDvrScheduleLoadFinishedListener mDvrLoadedListener =
+            new DvrDataManager.OnDvrScheduleLoadFinishedListener() {
+                @Override
+                public void onDvrScheduleLoadFinished() {
+                    if (mChannelDataLoaded) {
+                        for (ScheduledRecording r : mDvrDataManager.getAllScheduledRecordings()) {
+                            mScheduledRecordingListener.onScheduledRecordingAdded(r);
+                        }
+                    }
+                    mDvrDataManager.removeDvrScheduleLoadFinishedListener(this);
+                }
+            };
+
     private final ChannelDataManager.Listener mChannelDataManagerListener =
             new ChannelDataManager.Listener() {
                 @Override
                 public void onLoadFinished() {
+                    mChannelDataLoaded = true;
                     updateChannels(true, false);
                 }
 
@@ -212,46 +229,68 @@ public class ProgramManager {
     private final DvrDataManager.ScheduledRecordingListener mScheduledRecordingListener =
             new DvrDataManager.ScheduledRecordingListener() {
         @Override
-        public void onScheduledRecordingAdded(ScheduledRecording scheduledRecording) {
-            TableEntry oldEntry = getTableEntry(scheduledRecording);
-            if (oldEntry != null) {
-                TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program,
-                        scheduledRecording, oldEntry.entryStartUtcMillis,
-                        oldEntry.entryEndUtcMillis, oldEntry.isBlocked());
-                updateEntry(oldEntry, newEntry);
+        public void onScheduledRecordingAdded(ScheduledRecording... scheduledRecordings) {
+            for (ScheduledRecording schedule : scheduledRecordings) {
+                TableEntry oldEntry = getTableEntry(schedule);
+                if (oldEntry != null) {
+                    TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program,
+                            schedule, oldEntry.entryStartUtcMillis,
+                            oldEntry.entryEndUtcMillis, oldEntry.isBlocked());
+                    updateEntry(oldEntry, newEntry);
+                }
             }
         }
 
         @Override
-        public void onScheduledRecordingRemoved(ScheduledRecording scheduledRecording) {
-            TableEntry oldEntry = getTableEntry(scheduledRecording);
-            if (oldEntry != null) {
-                TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program, null,
-                        oldEntry.entryStartUtcMillis, oldEntry.entryEndUtcMillis,
-                        oldEntry.isBlocked());
-                updateEntry(oldEntry, newEntry);
+        public void onScheduledRecordingRemoved(ScheduledRecording... scheduledRecordings) {
+            for (ScheduledRecording schedule : scheduledRecordings) {
+                TableEntry oldEntry = getTableEntry(schedule);
+                if (oldEntry != null) {
+                    TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program, null,
+                            oldEntry.entryStartUtcMillis, oldEntry.entryEndUtcMillis,
+                            oldEntry.isBlocked());
+                    updateEntry(oldEntry, newEntry);
+                }
             }
         }
 
         @Override
-        public void onScheduledRecordingStatusChanged(ScheduledRecording scheduledRecording) {
-            TableEntry oldEntry = getTableEntry(scheduledRecording);
-            if (oldEntry != null) {
-                TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program,
-                        scheduledRecording, oldEntry.entryStartUtcMillis,
-                        oldEntry.entryEndUtcMillis, oldEntry.isBlocked());
-                updateEntry(oldEntry, newEntry);
+        public void onScheduledRecordingStatusChanged(ScheduledRecording... scheduledRecordings) {
+            for (ScheduledRecording schedule : scheduledRecordings) {
+                TableEntry oldEntry = getTableEntry(schedule);
+                if (oldEntry != null) {
+                    TableEntry newEntry = new TableEntry(oldEntry.channelId, oldEntry.program,
+                            schedule, oldEntry.entryStartUtcMillis,
+                            oldEntry.entryEndUtcMillis, oldEntry.isBlocked());
+                    updateEntry(oldEntry, newEntry);
+                }
             }
         }
     };
 
+    private final OnConflictStateChangeListener mOnConflictStateChangeListener =
+            new OnConflictStateChangeListener() {
+                @Override
+                public void onConflictStateChange(boolean conflict,
+                        ScheduledRecording... schedules) {
+                    for (ScheduledRecording schedule : schedules) {
+                        TableEntry entry = getTableEntry(schedule);
+                        if (entry != null) {
+                            notifyTableEntryUpdated(entry);
+                        }
+                    }
+                }
+            };
+
     public ProgramManager(TvInputManagerHelper tvInputManagerHelper,
             ChannelDataManager channelDataManager, ProgramDataManager programDataManager,
-            @Nullable DvrDataManager dvrDataManager) {
+            @Nullable DvrDataManager dvrDataManager,
+            @Nullable DvrScheduleManager dvrScheduleManager) {
         mTvInputManagerHelper = tvInputManagerHelper;
         mChannelDataManager = channelDataManager;
         mProgramDataManager = programDataManager;
         mDvrDataManager = dvrDataManager;
+        mDvrScheduleManager = dvrScheduleManager;
     }
 
     public void programGuideVisibilityChanged(boolean visible) {
@@ -260,13 +299,25 @@ public class ProgramManager {
             mChannelDataManager.addListener(mChannelDataManagerListener);
             mProgramDataManager.addListener(mProgramDataManagerListener);
             if (mDvrDataManager != null) {
+                if (!mDvrDataManager.isDvrScheduleLoadFinished()) {
+                    mDvrDataManager.addDvrScheduleLoadFinishedListener(mDvrLoadedListener);
+                }
                 mDvrDataManager.addScheduledRecordingListener(mScheduledRecordingListener);
+            }
+            if (mDvrScheduleManager != null) {
+                mDvrScheduleManager.addOnConflictStateChangeListener(
+                        mOnConflictStateChangeListener);
             }
         } else {
             mChannelDataManager.removeListener(mChannelDataManagerListener);
             mProgramDataManager.removeListener(mProgramDataManagerListener);
             if (mDvrDataManager != null) {
+                mDvrDataManager.removeDvrScheduleLoadFinishedListener(mDvrLoadedListener);
                 mDvrDataManager.removeScheduledRecordingListener(mScheduledRecordingListener);
+            }
+            if (mDvrScheduleManager != null) {
+                mDvrScheduleManager.removeOnConflictStateChangeListener(
+                        mOnConflictStateChangeListener);
             }
         }
     }
@@ -325,7 +376,7 @@ public class ProgramManager {
 
         mGenreChannelList.clear();
         for (int i = 0; i < GenreItems.getGenreCount(); i++) {
-            mGenreChannelList.add(new ArrayList<Channel>());
+            mGenreChannelList.add(new ArrayList<>());
         }
         for (Channel channel : mChannels) {
             // TODO: Use programs in visible area instead of using current programs only.
@@ -641,20 +692,6 @@ public class ProgramManager {
             }
         }
         return entries;
-    }
-
-    /**
-     * Get the currently selected channel.
-     */
-    public Channel getSelectedChannel() {
-        return mChannelDataManager.getChannel(mSelectedProgram.getChannelId());
-    }
-
-    /**
-     * Get the currently selected program.
-     */
-    public Program getSelectedProgram() {
-        return mSelectedProgram;
     }
 
     public interface Listener {

@@ -54,6 +54,7 @@ import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.GenreItems;
 import com.android.tv.data.ProgramDataManager;
 import com.android.tv.dvr.DvrDataManager;
+import com.android.tv.dvr.DvrScheduleManager;
 import com.android.tv.ui.HardwareLayerAnimatorListenerAdapter;
 import com.android.tv.util.TvInputManagerHelper;
 import com.android.tv.util.Utils;
@@ -163,10 +164,11 @@ public class ProgramGuide implements ProgramGrid.ChildFocusListener {
     public ProgramGuide(MainActivity activity, ChannelTuner channelTuner,
             TvInputManagerHelper tvInputManagerHelper, ChannelDataManager channelDataManager,
             ProgramDataManager programDataManager, @Nullable DvrDataManager dvrDataManager,
-            Tracker tracker, Runnable preShowRunnable, Runnable postHideRunnable) {
+            @Nullable DvrScheduleManager dvrScheduleManager, Tracker tracker,
+            Runnable preShowRunnable, Runnable postHideRunnable) {
         mActivity = activity;
         mProgramManager = new ProgramManager(tvInputManagerHelper, channelDataManager,
-                programDataManager, dvrDataManager);
+                programDataManager, dvrDataManager, dvrScheduleManager);
         mChannelTuner = channelTuner;
         mTracker = tracker;
         mPreShowRunnable = preShowRunnable;

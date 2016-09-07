@@ -18,6 +18,8 @@ package com.android.tv.dvr;
 
 import android.support.annotation.MainThread;
 
+import com.android.tv.dvr.ScheduledRecording.RecordingState;
+
 /**
  * Full data manager.
  *
@@ -27,27 +29,39 @@ import android.support.annotation.MainThread;
 @MainThread
 interface WritableDvrDataManager extends DvrDataManager {
     /**
-     * Add a new recording.
+     * Adds new recordings.
      */
-    void addScheduledRecording(ScheduledRecording scheduledRecording);
+    void addScheduledRecording(ScheduledRecording... scheduledRecordings);
 
     /**
-     * Add a season recording/
+     * Adds new series recordings.
      */
-    void addSeasonRecording(SeasonRecording seasonRecording);
+    void addSeriesRecording(SeriesRecording... seriesRecordings);
 
     /**
-     * Remove a recording.
+     * Removes recordings.
      */
-    void removeScheduledRecording(ScheduledRecording ScheduledRecording);
+    void removeScheduledRecording(ScheduledRecording... scheduledRecordings);
 
     /**
-     * Remove a season schedule.
+     * Removes series recordings.
+     *
+     * <p>Note that the finished or failed schedules are not deleted.
      */
-    void removeSeasonSchedule(SeasonRecording seasonSchedule);
+    void removeSeriesRecording(SeriesRecording... seasonSchedules);
 
     /**
-     * Update an existing recording.
+     * Updates existing recordings.
      */
-    void updateScheduledRecording(ScheduledRecording r);
+    void updateScheduledRecording(ScheduledRecording... scheduledRecordings);
+
+    /**
+     * Updates existing series recordings.
+     */
+    void updateSeriesRecording(SeriesRecording... seriesRecordings);
+
+    /**
+     * Changes the state of the recording.
+     */
+    void changeState(ScheduledRecording scheduledRecording, @RecordingState int newState);
 }
