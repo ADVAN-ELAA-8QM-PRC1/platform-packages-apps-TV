@@ -16,15 +16,6 @@
 
 LOCAL_PATH:= $(call my-dir)
 
-# --------------------------------------------------------------
-# Use prebuilt aprotoc to compile .proto files
-
-ifeq ($(HOST_OS),darwin)
-PROTOC := $(TOPDIR)prebuilts/misc/darwin-x86/protobuf/aprotoc
-else
-PROTOC := $(TOPDIR)prebuilts/misc/linux-x86/protobuf/aprotoc
-endif
-
 include $(CLEAR_VARS)
 
 LOCAL_MODULE_TAGS := optional
@@ -45,9 +36,17 @@ LOCAL_MIN_SDK_VERSION := 23  # M
 LOCAL_RESOURCE_DIR := \
     $(LOCAL_PATH)/res \
     $(LOCAL_PATH)/usbtuner-res \
-    $(LOCAL_PATH)/common/res \
+    $(LOCAL_PATH)/common/res
+
+ifdef TARGET_BUILD_APPS
+LOCAL_RESOURCE_DIR += \
+    $(TOP)/prebuilts/sdk/current/support/v17/leanback/res \
+    $(TOP)/prebuilts/sdk/current/support/v7/recyclerview/res
+else # !TARGET_BUILD_APPS
+LOCAL_RESOURCE_DIR += \
     $(TOP)/frameworks/support/v17/leanback/res \
-    $(TOP)/frameworks/support/v7/recyclerview/res \
+    $(TOP)/frameworks/support/v7/recyclerview/res
+endif
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
     android-support-annotations \
