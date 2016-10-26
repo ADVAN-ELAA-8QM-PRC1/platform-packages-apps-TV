@@ -29,9 +29,9 @@ import android.util.Log;
 import android.util.Range;
 
 import com.android.tv.common.SoftPreconditions;
-import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.data.Channel;
 import com.android.tv.data.Program;
+import com.android.tv.dvr.RecordedProgram;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -162,7 +162,7 @@ public abstract class AsyncDbTask<Params, Progress, Result>
 
         @Override
         public String toString() {
-            return this.getClass().getSimpleName() + "(" + mUri + ")";
+            return this.getClass().getName() + "(" + mUri + ")";
         }
     }
 

@@ -42,9 +42,9 @@
          found across application versions, hence a user is required to rescan the channels -->
     <string name="ut_rescan_needed">Tuner software has been recently updated. Please re-scan the
         channels.</string>
-    <!-- Message that says audio of the current channel is not available due to TV device
-         lacking the support of the feature AC3 audio passthrough -->
-    <string name="ut_ac3_passthrough_unavailable">AC3 audio not available</string>
+    <!-- Message that says audio of the current channel is not available due to surround sound
+         of TV device disabled -->
+    <string name="ut_surround_sound_disabled">Enable surround sound in system sound settings to enable audio</string>
     <!-- Usb Tuner setup common UI breadcrumb -->
     <string name="ut_setup_breadcrumb">Channel tuner setup</string>
     <!-- Title for TV Tuner main setup menu when no channel exists -->
@@ -111,6 +111,9 @@
     <string name="ut_channel_scan">USB channel tuner setup</string>
     <!-- Message that says channel is not yet scanned during channel scanning process -->
     <string name="ut_channel_scan_time">This may take several minutes</string>
+    <!-- Message that says Tuner is not available -->
+    <string name="ut_channel_scan_tuner_unavailable">Tuner is temporarily not available or already
+        used by recording.</string>
     <!-- Message that says channels are found during channel scanning process -->
     <plurals name="ut_channel_scan_message">
         <item quantity="one">%1$d channel found</item>

@@ -33,6 +33,7 @@ import android.os.Looper;
 import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -108,8 +109,8 @@ public class InputSessionManager {
      */
     @NonNull
     public RecordingSession createRecordingSession(String inputId, String tag,
-            RecordingCallback callback, Handler handler) {
-        RecordingSession session = new RecordingSession(inputId, tag, callback, handler);
+            RecordingCallback callback, Handler handler, long endTimeMs) {
+        RecordingSession session = new RecordingSession(inputId, tag, callback, handler, endTimeMs);
         mRecordingSessions.add(session);
         if (DEBUG) Log.d(TAG, "Recording session created: " + session);
         return session;
@@ -158,6 +159,24 @@ public class InputSessionManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Retruns the earliest end time of recording sessions in progress of the certain TV input.
+     */
+    @MainThread
+    public Long getEarliestRecordingSessionEndTimeMs(String inputId) {
+        long timeMs = Long.MAX_VALUE;
+        synchronized (mRecordingSessions) {
+            for (RecordingSession session : mRecordingSessions) {
+                if (session.mTuned && TextUtils.equals(inputId, session.mInputId)) {
+                    if (session.mEndTimeMs < timeMs) {
+                        timeMs = session.mEndTimeMs;
+                    }
+                }
+            }
+        }
+        return timeMs == Long.MAX_VALUE ? null : timeMs;
     }
 
     @MainThread
@@ -353,14 +372,17 @@ public class InputSessionManager {
         private Uri mChannelUri;
         private final RecordingCallback mCallback;
         private final Handler mHandler;
+        private volatile long mEndTimeMs;
         private TvRecordingClient mClient;
         private boolean mTuned;
 
-        RecordingSession(String inputId, String tag, RecordingCallback callback, Handler handler) {
+        RecordingSession(String inputId, String tag, RecordingCallback callback,
+                Handler handler, long endTimeMs) {
             mInputId = inputId;
             mCallback = callback;
             mHandler = handler;
             mClient = new TvRecordingClient(mContext, tag, callback, handler);
+            mEndTimeMs = endTimeMs;
         }
 
         void release() {
@@ -406,6 +428,7 @@ public class InputSessionManager {
                         });
                         return;
                     }
+                    mTuned = true;
                     int tunedTuneSessionCount = getTunedTvViewSessionCount(inputId);
                     if (!isTunedForTvView(channelUri) && tunedTuneSessionCount > 0
                             && tunedRecordingSessionCount + tunedTuneSessionCount
@@ -419,7 +442,6 @@ public class InputSessionManager {
                         }
                     }
                     mChannelUri = channelUri;
-                    mTuned = true;
                     mClient.tune(inputId, channelUri);
                 }
             });
@@ -437,6 +459,13 @@ public class InputSessionManager {
          */
         public void stopRecording() {
             mClient.stopRecording();
+        }
+
+        /**
+         * Sets recording session's ending time.
+         */
+        public void setEndTimeMs(long endTimeMs) {
+            mEndTimeMs = endTimeMs;
         }
 
         private void runOnHandler(Handler handler, Runnable runnable) {

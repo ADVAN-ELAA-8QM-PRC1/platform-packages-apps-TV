@@ -47,9 +47,9 @@ import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.guide.ProgramManager.TableEntry;
+import com.android.tv.util.ToastUtils;
 import com.android.tv.util.Utils;
 
-import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.TimeUnit;
 
@@ -73,8 +73,6 @@ public class ProgramItemView extends TextView {
     private static TextAppearanceSpan sEpisodeTitleStyle;
     private static TextAppearanceSpan sGrayedOutEpisodeTitleStyle;
 
-    private static WeakReference<Toast> sToast;
-
     private DvrManager mDvrManager;
     private TableEntry mTableEntry;
     private int mMaxWidthForRipple;
@@ -96,10 +94,9 @@ public class ProgramItemView extends TextView {
             ApplicationSingletons singletons = TvApplication.getSingletons(view.getContext());
             Tracker tracker = singletons.getTracker();
             tracker.sendEpgItemClicked();
+            final MainActivity tvActivity = (MainActivity) view.getContext();
+            final Channel channel = tvActivity.getChannelDataManager().getChannel(entry.channelId);
             if (entry.isCurrentProgram()) {
-                final MainActivity tvActivity = (MainActivity) view.getContext();
-                final Channel channel = tvActivity.getChannelDataManager()
-                        .getChannel(entry.channelId);
                 view.postDelayed(new Runnable() {
                     @Override
                     public void run() {
@@ -114,41 +111,24 @@ public class ProgramItemView extends TextView {
                 if (entry.entryStartUtcMillis > System.currentTimeMillis()
                         && dvrManager.isProgramRecordable(entry.program)) {
                     if (entry.scheduledRecording == null) {
-                        if (DvrUiHelper.handleCreateSchedule((MainActivity) view.getContext(),
-                                entry.program)) {
+                        if (DvrUiHelper.checkStorageStatusAndShowErrorMessage(tvActivity,
+                                channel.getInputId())
+                                && DvrUiHelper.handleCreateSchedule(tvActivity, entry.program)) {
                             String msg = view.getContext().getString(
                                     R.string.dvr_msg_program_scheduled, entry.program.getTitle());
-                            showToast(view.getContext(), msg);
+                            ToastUtils.show(view.getContext(), msg, Toast.LENGTH_SHORT);
                         }
-                    } else if (entry.scheduledRecording.getState()
-                            == ScheduledRecording.STATE_RECORDING_CANCELED) {
-                        // TODO: replace the toast with a dialog.
-                        String msg = view.getResources().getString(
-                                R.string.dvr_msg_program_scheduled, entry.program.getTitle());
-                        showToast(view.getContext(), msg);
-                        dvrManager.updateScheduledRecording(ScheduledRecording.buildFrom(entry
-                                .scheduledRecording).setState(ScheduledRecording
-                                .STATE_RECORDING_NOT_STARTED).build());
                     } else {
                         dvrManager.removeScheduledRecording(entry.scheduledRecording);
                         String msg = view.getResources().getString(
                                 R.string.dvr_schedules_deletion_info, entry.program.getTitle());
-                        showToast(view.getContext(), msg);
+                        ToastUtils.show(view.getContext(), msg, Toast.LENGTH_SHORT);
                     }
                 } else {
-                    showToast(view.getContext(), view.getResources()
-                            .getString(R.string.dvr_msg_cannot_record_program));
+                    ToastUtils.show(view.getContext(), view.getResources()
+                            .getString(R.string.dvr_msg_cannot_record_program), Toast.LENGTH_SHORT);
                 }
             }
-        }
-
-        private void showToast(Context context, String msg) {
-            if (sToast != null && sToast.get() != null) {
-                sToast.get().cancel();
-            }
-            Toast toast = Toast.makeText(context, msg, Toast.LENGTH_SHORT);
-            toast.show();
-            sToast = new WeakReference<>(toast);
         }
     };
 
@@ -322,7 +302,7 @@ public class ProgramItemView extends TextView {
             int iconResId = 0;
             if (mTableEntry.scheduledRecording != null) {
                 if (mDvrManager.isConflicting(mTableEntry.scheduledRecording)) {
-                    iconResId = R.drawable.ic_warning_white_36dp;
+                    iconResId = R.drawable.ic_warning_white_18dp;
                 } else {
                     switch (mTableEntry.scheduledRecording.getState()) {
                         case ScheduledRecording.STATE_RECORDING_NOT_STARTED:

@@ -24,6 +24,7 @@ import android.database.Cursor;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -32,23 +33,20 @@ import android.support.annotation.MainThread;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import com.google.android.exoplayer.upstream.DataSource;
+import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.common.recording.RecordingCapability;
+import com.android.tv.dvr.DvrStorageStatusManager;
 import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.tuner.DvbDeviceAccessor;
-import com.android.tv.tuner.TunerFlags;
 import com.android.tv.tuner.data.PsipData;
 import com.android.tv.tuner.data.TunerChannel;
-import com.android.tv.tuner.exoplayer.DataSourceAdapter;
 import com.android.tv.tuner.exoplayer.ExoPlayerSampleExtractor;
-import com.android.tv.tuner.exoplayer.FrameworkSampleExtractor;
 import com.android.tv.tuner.exoplayer.SampleExtractor;
 import com.android.tv.tuner.exoplayer.buffer.BufferManager;
 import com.android.tv.tuner.exoplayer.buffer.DvrStorageManager;
-import com.android.tv.tuner.source.TsMediaDataSource;
-import com.android.tv.tuner.source.TsMediaDataSourceManager;
-import com.android.tv.util.DvrTunerStorageUtils;
+import com.android.tv.tuner.source.TsDataSource;
+import com.android.tv.tuner.source.TsDataSourceManager;
 import com.android.tv.util.Utils;
 
 import java.io.File;
@@ -75,11 +73,13 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
             + TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS;
     private static final long STORAGE_MONITOR_INTERVAL_MS = TimeUnit.SECONDS.toMillis(4);
     private static final long MIN_PARTIAL_RECORDING_DURATION_MS = TimeUnit.SECONDS.toMillis(10);
+    private static final long PREPARE_RECORDER_POLL_MS = 50;
     private static final int MSG_TUNE = 1;
     private static final int MSG_START_RECORDING = 2;
-    private static final int MSG_STOP_RECORDING = 3;
-    private static final int MSG_MONITOR_STORAGE_STATUS = 4;
-    private static final int MSG_RELEASE = 5;
+    private static final int MSG_PREPARE_RECODER = 3;
+    private static final int MSG_STOP_RECORDING = 4;
+    private static final int MSG_MONITOR_STORAGE_STATUS = 5;
+    private static final int MSG_RELEASE = 6;
     private final RecordingCapability mCapabilities;
 
     public RecordingCapability getCapabilities() {
@@ -97,12 +97,12 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
 
     private final Context mContext;
     private final ChannelDataManager mChannelDataManager;
+    private final DvrStorageStatusManager mDvrStorageStatusManager;
     private final Handler mHandler;
-    private final TsMediaDataSourceManager mSourceManager;
+    private final TsDataSourceManager mSourceManager;
     private final Random mRandom = new Random();
-    private final CountDownLatch mReleaseLatch = new CountDownLatch(1);
 
-    private TsMediaDataSource mTunerSource;
+    private TsDataSource mTunerSource;
     private TunerChannel mChannel;
     private File mStorageDir;
     private long mRecordStartTime;
@@ -122,9 +122,11 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
         HandlerThread handlerThread = new HandlerThread(TAG);
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper(), this);
+        mDvrStorageStatusManager =
+                TvApplication.getSingletons(context).getDvrStorageStatusManager();
         mChannelDataManager = dataManager;
         mChannelDataManager.checkDataVersion(context);
-        mSourceManager = TsMediaDataSourceManager.createSourceManager(true);
+        mSourceManager = TsDataSourceManager.createSourceManager(true);
         mCapabilities = new DvbDeviceAccessor(context).getRecordingCapability(inputId);
         mInputId = inputId;
         if (DEBUG) Log.d(TAG, mCapabilities.toString());
@@ -202,13 +204,6 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
     public void release() {
         mHandler.removeCallbacksAndMessages(null);
         mHandler.sendEmptyMessage(MSG_RELEASE);
-        try {
-            mReleaseLatch.await();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Couldn't wait for finish of MSG_RELEASE", e);
-        } finally {
-            mHandler.getLooper().quitSafely();
-        }
     }
 
     @Override
@@ -216,6 +211,7 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
         switch (msg.what) {
             case MSG_TUNE: {
                 Uri channelUri = (Uri) msg.obj;
+                if (DEBUG) Log.d(TAG, "Tune to " + channelUri);
                 if (doTune(channelUri)) {
                     mSession.onTuned(channelUri);
                 } else {
@@ -224,12 +220,31 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
                 return true;
             }
             case MSG_START_RECORDING: {
+                if (DEBUG) Log.d(TAG, "Start recording");
                 if (!doStartRecording((Uri) msg.obj)) {
                     reset();
                 }
                 return true;
             }
+            case MSG_PREPARE_RECODER: {
+                if (DEBUG) Log.d(TAG, "Preparing recorder");
+                if (!mRecorderRunning) {
+                    return true;
+                }
+                try {
+                    if (!mRecorder.prepare()) {
+                        mHandler.sendEmptyMessageDelayed(MSG_PREPARE_RECODER,
+                                PREPARE_RECORDER_POLL_MS);
+                    }
+                } catch (IOException e) {
+                    Log.w(TAG, "Failed to start recording. Couldn't prepare an extractor");
+                    mSession.onError(TvInputManager.RECORDING_ERROR_UNKNOWN);
+                    reset();
+                }
+                return true;
+            }
             case MSG_STOP_RECORDING: {
+                if (DEBUG) Log.d(TAG, "Stop recording");
                 if (mSessionState != STATE_RECORDING) {
                     mSession.onError(TvInputManager.RECORDING_ERROR_UNKNOWN);
                     reset();
@@ -244,12 +259,12 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
                 if (mSessionState != STATE_RECORDING) {
                     return true;
                 }
-                if (!DvrTunerStorageUtils.isStorageSufficient(mContext)) {
+                if (!mDvrStorageStatusManager.isStorageSufficient()) {
                     if (mRecorderRunning) {
                         stopRecorder();
                     }
+                    new DeleteRecordingTask().execute(mStorageDir);
                     mSession.onError(TvInputManager.RECORDING_ERROR_INSUFFICIENT_SPACE);
-                    Utils.deleteDirOrFile(mStorageDir);
                     reset();
                 } else {
                     mHandler.sendEmptyMessageDelayed(MSG_MONITOR_STORAGE_STATUS,
@@ -262,7 +277,8 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
                 // without notification.
                 reset();
                 mSourceManager.release();
-                mReleaseLatch.countDown();
+                mHandler.removeCallbacksAndMessages(null);
+                mHandler.getLooper().quitSafely();
                 return true;
             }
         }
@@ -318,7 +334,7 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
             Log.w(TAG, "Failed to start recording. Couldn't find the channel for " + mChannel);
             return false;
         }
-        if (!DvrTunerStorageUtils.isStorageSufficient(mContext)) {
+        if (!mDvrStorageStatusManager.isStorageSufficient()) {
             mSession.onError(TvInputManager.RECORDING_ERROR_INSUFFICIENT_SPACE);
             Log.w(TAG, "Tuning failed due to insufficient storage.");
             return false;
@@ -339,8 +355,9 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
             Log.e(TAG, "Recording session status abnormal");
             return false;
         }
-        mStorageDir = DvrTunerStorageUtils.isStorageSufficient(mContext) ?
-                DvrTunerStorageUtils.getRecordingDataDirectory(mContext, getStorageKey()) : null;
+        mStorageDir = mDvrStorageStatusManager.isStorageSufficient() ?
+                new File(mDvrStorageStatusManager.getRecordingRootDataDirectory(),
+                        getStorageKey()) : null;
         if (mStorageDir == null) {
             mSession.onError(TvInputManager.RECORDING_ERROR_INSUFFICIENT_SPACE);
             Log.w(TAG, "Failed to start recording due to insufficient storage.");
@@ -350,23 +367,13 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
         mTunerSource.shiftStartPosition(mTunerSource.getBufferedPosition());
         mBufferManager = new BufferManager(new DvrStorageManager(mStorageDir, true));
         mRecordStartTime = System.currentTimeMillis();
-        if (TunerFlags.USE_EXTRACTOR_IN_EXOPLAYER) {
-            mRecorder = new ExoPlayerSampleExtractor(new DataSourceAdapter(mTunerSource),
-                    mBufferManager, this, true);
-        } else {
-            mRecorder = new FrameworkSampleExtractor(mTunerSource, mBufferManager, this, true);
-        }
+        mRecorder = new ExoPlayerSampleExtractor(Uri.EMPTY, mTunerSource, mBufferManager, this,
+                true);
         mRecorder.setOnCompletionListener(this, mHandler);
         mProgramUri = programUri;
-        try {
-            mRecorder.prepare();
-        } catch (IOException e) {
-            Log.w(TAG, "Failed to start recording. Couldn't prepare a extractor");
-            mSession.onError(TvInputManager.RECORDING_ERROR_UNKNOWN);
-            return false;
-        }
         mSessionState = STATE_RECORDING;
         mRecorderRunning = true;
+        mHandler.sendEmptyMessage(MSG_PREPARE_RECODER);
         mHandler.removeMessages(MSG_MONITOR_STORAGE_STATUS);
         mHandler.sendEmptyMessageDelayed(MSG_MONITOR_STORAGE_STATUS,
                 STORAGE_MONITOR_INTERVAL_MS);
@@ -553,9 +560,9 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
         }
         if (!success && lastExtractedPositionUs <
                 TimeUnit.MILLISECONDS.toMicros(MIN_PARTIAL_RECORDING_DURATION_MS)) {
+            new DeleteRecordingTask().execute(mStorageDir);
             mSession.onError(TvInputManager.RECORDING_ERROR_UNKNOWN);
             Log.w(TAG, "Recording failed during recording");
-            Utils.deleteDirOrFile(mStorageDir);
             return;
         }
         Log.i(TAG, "recording finished " + (success ? "completely" : "partially"));
@@ -563,11 +570,25 @@ public class TunerRecordingSessionWorker implements PlaybackBufferListener,
                 Uri.fromFile(mStorageDir).toString(), 1024 * 1024, mRecordStartTime,
                 mRecordStartTime + TimeUnit.MICROSECONDS.toMillis(lastExtractedPositionUs));
         if (uri == null) {
+            new DeleteRecordingTask().execute(mStorageDir);
             mSession.onError(TvInputManager.RECORDING_ERROR_UNKNOWN);
             Log.e(TAG, "Inserting a recording to DB failed");
-            Utils.deleteDirOrFile(mStorageDir);
             return;
         }
         mSession.onRecordFinished(uri);
+    }
+
+    private static class DeleteRecordingTask extends AsyncTask<File, Void, Void> {
+
+        @Override
+        public Void doInBackground(File... files) {
+            if (files == null || files.length == 0) {
+                return null;
+            }
+            for(File file : files) {
+                Utils.deleteDirOrFile(file);
+            }
+            return null;
+        }
     }
 }

@@ -20,19 +20,14 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.media.tv.TvContract;
-import android.media.tv.TvContract.Programs;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.support.annotation.MainThread;
-import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
-import android.support.annotation.WorkerThread;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
+import android.util.LongSparseArray;
 
 import com.android.tv.ApplicationSingletons;
 import com.android.tv.TvApplication;
@@ -43,10 +38,8 @@ import com.android.tv.data.Program;
 import com.android.tv.data.epg.EpgFetcher;
 import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
 import com.android.tv.dvr.DvrDataManager.SeriesRecordingListener;
+import com.android.tv.dvr.EpisodicProgramLoadTask.ScheduledEpisode;
 import com.android.tv.experiments.Experiments;
-import com.android.tv.util.AsyncDbTask.AsyncProgramQueryTask;
-import com.android.tv.util.AsyncDbTask.CursorFilter;
-import com.android.tv.util.PermissionUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,7 +52,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.Set;
 
 /**
@@ -70,20 +63,7 @@ import java.util.Set;
 @TargetApi(Build.VERSION_CODES.N)
 public class SeriesRecordingScheduler {
     private static final String TAG = "SeriesRecordingSchd";
-
-    private static final int PROGRAM_ID_INDEX = Program.getColumnIndex(Programs._ID);
-    private static final int RECORDING_PROHIBITED_INDEX =
-            Program.getColumnIndex(Programs.COLUMN_RECORDING_PROHIBITED);
-
-    private static final String PARAM_START_TIME = "start_time";
-    private static final String PARAM_END_TIME = "end_time";
-
-    private static final String PROGRAM_SELECTION =
-            Programs.COLUMN_START_TIME_UTC_MILLIS + ">? AND (" +
-            Programs.COLUMN_SEASON_DISPLAY_NUMBER + " IS NOT NULL OR " +
-            Programs.COLUMN_EPISODE_DISPLAY_NUMBER + " IS NOT NULL) AND " +
-            Programs.COLUMN_RECORDING_PROHIBITED + "=0";
-    private static final String CHANNEL_ID_PREDICATE = Programs.COLUMN_CHANNEL_ID + "=?";
+    private static final boolean DEBUG = false;
 
     private static final String KEY_FETCHED_SERIES_IDS =
             "SeriesRecordingScheduler.fetched_series_ids";
@@ -109,6 +89,11 @@ public class SeriesRecordingScheduler {
     private final Set<String> mFetchedSeriesIds = new ArraySet<>();
     private final SharedPreferences mSharedPreferences;
     private boolean mStarted;
+    private boolean mPaused;
+    private final Set<Long> mPendingSeriesRecordings = new ArraySet<>();
+    private final Set<OnSeriesRecordingUpdatedListener> mOnSeriesRecordingUpdatedListeners =
+            new CopyOnWriteArraySet<>();
+
 
     private final SeriesRecordingListener mSeriesRecordingListener = new SeriesRecordingListener() {
         @Override
@@ -124,7 +109,7 @@ public class SeriesRecordingScheduler {
             for (Iterator<SeriesRecordingUpdateTask> iter = mScheduleTasks.iterator();
                  iter.hasNext(); ) {
                 SeriesRecordingUpdateTask task = iter.next();
-                if (CollectionUtils.subtract(task.mSeriesRecordings, seriesRecordings,
+                if (CollectionUtils.subtract(task.getSeriesRecordings(), seriesRecordings,
                         SeriesRecording.ID_COMPARATOR).isEmpty()) {
                     task.cancel(true);
                     iter.remove();
@@ -134,7 +119,21 @@ public class SeriesRecordingScheduler {
 
         @Override
         public void onSeriesRecordingChanged(SeriesRecording... seriesRecordings) {
-            updateSchedules(Arrays.asList(seriesRecordings));
+            List<SeriesRecording> stopped = new ArrayList<>();
+            List<SeriesRecording> normal = new ArrayList<>();
+            for (SeriesRecording r : seriesRecordings) {
+                if (r.isStopped()) {
+                    stopped.add(r);
+                } else {
+                    normal.add(r);
+                }
+            }
+            if (!stopped.isEmpty()) {
+                onSeriesRecordingRemoved(SeriesRecording.toArray(stopped));
+            }
+            if (!normal.isEmpty()) {
+                updateSchedules(normal);
+            }
         }
     };
 
@@ -174,8 +173,6 @@ public class SeriesRecordingScheduler {
                     Set<Long> seriesRecordingIds = new HashSet<>();
                     for (ScheduledRecording r : schedules) {
                         if (r.getSeriesRecordingId() != SeriesRecording.ID_NOT_SET) {
-                            SoftPreconditions.checkState(r.getState()
-                                    != ScheduledRecording.STATE_RECORDING_FINISHED);
                             seriesRecordingIds.add(r.getSeriesRecordingId());
                         }
                     }
@@ -214,6 +211,7 @@ public class SeriesRecordingScheduler {
         if (mStarted) {
             return;
         }
+        if (DEBUG) Log.d(TAG, "start");
         mStarted = true;
         mDataManager.addSeriesRecordingListener(mSeriesRecordingListener);
         mDataManager.addScheduledRecordingListener(mScheduledRecordingListener);
@@ -226,13 +224,16 @@ public class SeriesRecordingScheduler {
         if (!mStarted) {
             return;
         }
+        if (DEBUG) Log.d(TAG, "stop");
         mStarted = false;
         for (FetchSeriesInfoTask task : mFetchSeriesInfoTasks) {
             task.cancel(true);
         }
+        mFetchSeriesInfoTasks.clear();
         for (SeriesRecordingUpdateTask task : mScheduleTasks) {
             task.cancel(true);
         }
+        mScheduleTasks.clear();
         mDataManager.removeScheduledRecordingListener(mScheduledRecordingListener);
         mDataManager.removeSeriesRecordingListener(mSeriesRecordingListener);
     }
@@ -254,26 +255,81 @@ public class SeriesRecordingScheduler {
     }
 
     /**
-     * Creates/Updates the schedules for all the series recordings.
+     * Pauses the updates of the series recordings.
      */
-    @MainThread
-    public void updateSchedules() {
+    public void pauseUpdate() {
+        if (DEBUG) Log.d(TAG, "Schedule paused");
+        if (mPaused) {
+            return;
+        }
+        mPaused = true;
         if (!mStarted) {
             return;
         }
-        updateSchedules(mDataManager.getSeriesRecordings());
+        for (SeriesRecordingUpdateTask task : mScheduleTasks) {
+            for (SeriesRecording r : task.getSeriesRecordings()) {
+                mPendingSeriesRecordings.add(r.getId());
+            }
+            task.cancel(true);
+        }
     }
 
-    private void updateSchedules(Collection<SeriesRecording> seriesRecordings) {
+    /**
+     * Resumes the updates of the series recordings.
+     */
+    public void resumeUpdate() {
+        if (DEBUG) Log.d(TAG, "Schedule resumed");
+        if (!mPaused) {
+            return;
+        }
+        mPaused = false;
+        if (!mStarted) {
+            return;
+        }
+        if (!mPendingSeriesRecordings.isEmpty()) {
+            List<SeriesRecording> seriesRecordings = new ArrayList<>();
+            for (long seriesRecordingId : mPendingSeriesRecordings) {
+                SeriesRecording seriesRecording =
+                        mDataManager.getSeriesRecording(seriesRecordingId);
+                if (seriesRecording != null) {
+                    seriesRecordings.add(seriesRecording);
+                }
+            }
+            if (!seriesRecordings.isEmpty()) {
+                updateSchedules(seriesRecordings);
+            }
+        }
+    }
+
+    /**
+     * Update schedules for the given series recordings. If it's paused, the update will be done
+     * after it's resumed.
+     */
+    public void updateSchedules(Collection<SeriesRecording> seriesRecordings) {
+        if (DEBUG) Log.d(TAG, "updateSchedules:" + seriesRecordings);
+        if (!mStarted) {
+            if (DEBUG) Log.d(TAG, "Not started yet.");
+            return;
+        }
+        if (mPaused) {
+            for (SeriesRecording r : seriesRecordings) {
+                mPendingSeriesRecordings.add(r.getId());
+            }
+            if (DEBUG) {
+                Log.d(TAG, "The scheduler has been paused. Adding to the pending list. size="
+                        + mPendingSeriesRecordings.size());
+            }
+            return;
+        }
         Set<SeriesRecording> previousSeriesRecordings = new HashSet<>();
         for (Iterator<SeriesRecordingUpdateTask> iter = mScheduleTasks.iterator();
              iter.hasNext(); ) {
             SeriesRecordingUpdateTask task = iter.next();
-            if (CollectionUtils.containsAny(task.mSeriesRecordings, seriesRecordings,
+            if (CollectionUtils.containsAny(task.getSeriesRecordings(), seriesRecordings,
                     SeriesRecording.ID_COMPARATOR)) {
                 // The task is affected by the seriesRecordings
                 task.cancel(true);
-                previousSeriesRecordings.addAll(task.mSeriesRecordings);
+                previousSeriesRecordings.addAll(task.getSeriesRecordings());
                 iter.remove();
             }
         }
@@ -281,38 +337,44 @@ public class SeriesRecordingScheduler {
                 previousSeriesRecordings, SeriesRecording.ID_COMPARATOR);
         for (Iterator<SeriesRecording> iter = seriesRecordingsToUpdate.iterator();
                 iter.hasNext(); ) {
-            if (mDataManager.getSeriesRecording(iter.next().getId()) == null) {
-                // Series recording has been removed.
+            SeriesRecording seriesRecording = mDataManager.getSeriesRecording(iter.next().getId());
+            if (seriesRecording == null || seriesRecording.isStopped()) {
+                // Series recording has been removed or stopped.
                 iter.remove();
             }
         }
         if (seriesRecordingsToUpdate.isEmpty()) {
             return;
         }
-        List<SeriesRecordingUpdateTask> tasksToRun = new ArrayList<>();
         if (needToReadAllChannels(seriesRecordingsToUpdate)) {
-            SeriesRecordingUpdateTask task = new SeriesRecordingUpdateTask(seriesRecordingsToUpdate,
-                    createSqlParams(seriesRecordingsToUpdate, null));
-            tasksToRun.add(task);
+            SeriesRecordingUpdateTask task =
+                    new SeriesRecordingUpdateTask(seriesRecordingsToUpdate);
             mScheduleTasks.add(task);
+            if (DEBUG) Log.d(TAG, "Added schedule task: " + task);
+            task.execute();
         } else {
             for (SeriesRecording seriesRecording : seriesRecordingsToUpdate) {
                 SeriesRecordingUpdateTask task = new SeriesRecordingUpdateTask(
-                        Collections.singletonList(seriesRecording),
-                        createSqlParams(Collections.singletonList(seriesRecording), null));
-                tasksToRun.add(task);
+                        Collections.singletonList(seriesRecording));
                 mScheduleTasks.add(task);
+                if (DEBUG) Log.d(TAG, "Added schedule task: " + task);
+                task.execute();
             }
-        }
-        if (mDataManager.isDvrScheduleLoadFinished()) {
-            runTasks(tasksToRun);
         }
     }
 
-    private void runTasks(List<SeriesRecordingUpdateTask> tasks) {
-        for (SeriesRecordingUpdateTask task : tasks) {
-            task.executeOnDbThread();
-        }
+    /**
+     * Adds {@link OnSeriesRecordingUpdatedListener}.
+     */
+    public void addOnSeriesRecordingUpdatedListener(OnSeriesRecordingUpdatedListener listener) {
+        mOnSeriesRecordingUpdatedListeners.add(listener);
+    }
+
+    /**
+     * Removes {@link OnSeriesRecordingUpdatedListener}.
+     */
+    public void removeOnSeriesRecordingUpdatedListener(OnSeriesRecordingUpdatedListener listener) {
+        mOnSeriesRecordingUpdatedListeners.remove(listener);
     }
 
     private boolean needToReadAllChannels(List<SeriesRecording> seriesRecordingsToUpdate) {
@@ -325,94 +387,6 @@ public class SeriesRecordingScheduler {
     }
 
     /**
-     * Queries the programs which are related to the series.
-     * <p>
-     * This is called from the UI when the series recording is created.
-     */
-    public void queryPrograms(SeriesRecording series, ProgramLoadCallback callback) {
-        SoftPreconditions.checkState(mDataManager.isInitialized());
-        Set<ScheduledEpisode> scheduledEpisodes = new HashSet<>();
-        for (RecordedProgram recordedProgram : mDataManager.getRecordedPrograms()) {
-            if (series.getSeriesId().equals(recordedProgram.getSeriesId())) {
-                scheduledEpisodes.add(new ScheduledEpisode(series.getId(),
-                        recordedProgram.getSeasonNumber(), recordedProgram.getEpisodeNumber()));
-            }
-        }
-        SqlParams sqlParams = createSqlParams(Collections.singletonList(series), scheduledEpisodes);
-        new AsyncProgramQueryTask(mContext.getContentResolver(), sqlParams.uri, sqlParams.selection,
-                sqlParams.selectionArgs, null, sqlParams.filter) {
-            @Override
-            protected void onPostExecute(List<Program> programs) {
-                SoftPreconditions.checkNotNull(programs);
-                if (programs == null) {
-                    Log.e(TAG, "Creating schedules for series recording failed: " + series);
-                    callback.onProgramLoadFinished(Collections.emptyList());
-                } else {
-                    Map<Long, List<Program>> seriesProgramMap = pickOneProgramPerEpisode(
-                            Collections.singletonList(series), programs);
-                    callback.onProgramLoadFinished(seriesProgramMap.get(series.getId()));
-                }
-            }
-        }.executeOnDbThread();
-        // To shorten the response time from UI, cancel and restart the background job.
-        restartTasks();
-    }
-
-    private void restartTasks() {
-        Set<SeriesRecording> seriesRecordings = new HashSet<>();
-        for (SeriesRecordingUpdateTask task : mScheduleTasks) {
-            seriesRecordings.addAll(task.mSeriesRecordings);
-            task.cancel(true);
-        }
-        mScheduleTasks.clear();
-        updateSchedules(seriesRecordings);
-    }
-
-    private SqlParams createSqlParams(List<SeriesRecording> seriesRecordings,
-            Set<ScheduledEpisode> scheduledEpisodes) {
-        SqlParams sqlParams = new SqlParams();
-        if (PermissionUtils.hasAccessAllEpg(mContext)) {
-            sqlParams.uri = Programs.CONTENT_URI;
-            if (needToReadAllChannels(seriesRecordings)) {
-                sqlParams.selection = PROGRAM_SELECTION;
-                sqlParams.selectionArgs = new String[] {Long.toString(System.currentTimeMillis())};
-            } else {
-                SoftPreconditions.checkArgument(seriesRecordings.size() == 1);
-                sqlParams.selection = PROGRAM_SELECTION + " AND " + CHANNEL_ID_PREDICATE;
-                sqlParams.selectionArgs = new String[] {Long.toString(System.currentTimeMillis()),
-                        Long.toString(seriesRecordings.get(0).getChannelId())};
-            }
-            sqlParams.filter = new SeriesRecordingCursorFilter(seriesRecordings, scheduledEpisodes);
-        } else {
-            if (needToReadAllChannels(seriesRecordings)) {
-                sqlParams.uri = Programs.CONTENT_URI.buildUpon()
-                        .appendQueryParameter(PARAM_START_TIME,
-                                String.valueOf(System.currentTimeMillis()))
-                        .appendQueryParameter(PARAM_END_TIME, String.valueOf(Long.MAX_VALUE))
-                        .build();
-            } else {
-                SoftPreconditions.checkArgument(seriesRecordings.size() == 1);
-                sqlParams.uri = TvContract.buildProgramsUriForChannel(
-                        seriesRecordings.get(0).getChannelId(),
-                        System.currentTimeMillis(), Long.MAX_VALUE);
-            }
-            sqlParams.selection = null;
-            sqlParams.selectionArgs = null;
-            sqlParams.filter = new SeriesRecordingCursorFilterForNonSystem(seriesRecordings,
-                    scheduledEpisodes);
-        }
-        return sqlParams;
-    }
-
-    @VisibleForTesting
-    static boolean isEpisodeScheduled(Collection<ScheduledEpisode> scheduledEpisodes,
-            ScheduledEpisode episode) {
-        // The episode whose season number or episode number is null will always be scheduled.
-        return scheduledEpisodes.contains(episode) && !TextUtils.isEmpty(episode.seasonNumber)
-                && !TextUtils.isEmpty(episode.episodeNumber);
-    }
-
-    /**
      * Pick one program per an episode.
      *
      * <p>Note that the programs which has been already scheduled have the highest priority, and all
@@ -421,7 +395,7 @@ public class SeriesRecordingScheduler {
      * <p>If there are no existing schedules for an episode, one program which starts earlier is
      * picked.
      */
-    private Map<Long, List<Program>> pickOneProgramPerEpisode(
+    private LongSparseArray<List<Program>> pickOneProgramPerEpisode(
             List<SeriesRecording> seriesRecordings, List<Program> programs) {
         return pickOneProgramPerEpisode(mDataManager, seriesRecordings, programs);
     }
@@ -430,10 +404,11 @@ public class SeriesRecordingScheduler {
      * @see #pickOneProgramPerEpisode(List, List)
      */
     @VisibleForTesting
-    static Map<Long, List<Program>> pickOneProgramPerEpisode(DvrDataManager dataManager,
-            List<SeriesRecording> seriesRecordings, List<Program> programs) {
+    static LongSparseArray<List<Program>> pickOneProgramPerEpisode(
+            DvrDataManager dataManager, List<SeriesRecording> seriesRecordings,
+            List<Program> programs) {
         // Initialize.
-        Map<Long, List<Program>> result = new HashMap<>();
+        LongSparseArray<List<Program>> result = new LongSparseArray<>();
         Map<String, Long> seriesRecordingIds = new HashMap<>();
         for (SeriesRecording seriesRecording : seriesRecordings) {
             result.put(seriesRecording.getId(), new ArrayList<>());
@@ -508,27 +483,27 @@ public class SeriesRecordingScheduler {
      * This works only for the existing series recordings. Do not use this task for the
      * "adding series recording" UI.
      */
-    private class SeriesRecordingUpdateTask extends AsyncProgramQueryTask {
-        private final List<SeriesRecording> mSeriesRecordings = new ArrayList<>();
-
-        SeriesRecordingUpdateTask(List<SeriesRecording> seriesRecordings, SqlParams sqlParams) {
-            super(mContext.getContentResolver(), sqlParams.uri, sqlParams.selection,
-                    sqlParams.selectionArgs, null, sqlParams.filter);
-            mSeriesRecordings.addAll(seriesRecordings);
+    private class SeriesRecordingUpdateTask extends EpisodicProgramLoadTask {
+        SeriesRecordingUpdateTask(List<SeriesRecording> seriesRecordings) {
+            super(mContext, seriesRecordings);
         }
 
         @Override
         protected void onPostExecute(List<Program> programs) {
+            if (DEBUG) Log.d(TAG, "onPostExecute: updating schedules with programs:" + programs);
             mScheduleTasks.remove(this);
             if (programs == null) {
-                Log.e(TAG, "Creating schedules for series recording failed: " + mSeriesRecordings);
+                Log.e(TAG, "Creating schedules for series recording failed: "
+                        + getSeriesRecordings());
                 return;
             }
-            Map<Long, List<Program>> seriesProgramMap = pickOneProgramPerEpisode(
-                    mSeriesRecordings, programs);
-            for (SeriesRecording seriesRecording : mSeriesRecordings) {
+            LongSparseArray<List<Program>> seriesProgramMap = pickOneProgramPerEpisode(
+                    getSeriesRecordings(), programs);
+            for (SeriesRecording seriesRecording : getSeriesRecordings()) {
                 // Check the series recording is still valid.
-                if (mDataManager.getSeriesRecording(seriesRecording.getId()) == null) {
+                SeriesRecording actualSeriesRecording = mDataManager.getSeriesRecording(
+                        seriesRecording.getId());
+                if (actualSeriesRecording == null || actualSeriesRecording.isStopped()) {
                     continue;
                 }
                 List<Program> programsToSchedule = seriesProgramMap.get(seriesRecording.getId());
@@ -537,122 +512,25 @@ public class SeriesRecordingScheduler {
                     mDvrManager.addScheduleToSeriesRecording(seriesRecording, programsToSchedule);
                 }
             }
+            if (!mOnSeriesRecordingUpdatedListeners.isEmpty()) {
+                for (OnSeriesRecordingUpdatedListener listener
+                        : mOnSeriesRecordingUpdatedListeners) {
+                    listener.onSeriesRecordingUpdated(
+                            SeriesRecording.toArray(getSeriesRecordings()));
+                }
+            }
         }
 
         @Override
         protected void onCancelled(List<Program> programs) {
             mScheduleTasks.remove(this);
         }
-    }
-
-    /**
-     * Filter the programs which match the series recording. The episodes which the schedules are
-     * already created for are filtered out too.
-     */
-    private class SeriesRecordingCursorFilter implements CursorFilter {
-        private final List<SeriesRecording> mSeriesRecording = new ArrayList<>();
-        private final Set<Long> mDisallowedProgramIds = new HashSet<>();
-        private final Set<ScheduledEpisode> mScheduledEpisodes = new HashSet<>();
-
-        SeriesRecordingCursorFilter(List<SeriesRecording> seriesRecordings,
-                Set<ScheduledEpisode> scheduledEpisodes) {
-            mSeriesRecording.addAll(seriesRecordings);
-            mDisallowedProgramIds.addAll(mDataManager.getDisallowedProgramIds());
-            Set<Long> seriesRecordingIds = new HashSet<>();
-            for (SeriesRecording r : seriesRecordings) {
-                seriesRecordingIds.add(r.getId());
-            }
-            if (scheduledEpisodes != null) {
-                mScheduledEpisodes.addAll(scheduledEpisodes);
-            }
-            for (ScheduledRecording r : mDataManager.getAllScheduledRecordings()) {
-                if (seriesRecordingIds.contains(r.getSeriesRecordingId())
-                        && r.getState() != ScheduledRecording.STATE_RECORDING_FAILED
-                        && r.getState() != ScheduledRecording.STATE_RECORDING_CLIPPED) {
-                    mScheduledEpisodes.add(new ScheduledEpisode(r));
-                }
-            }
-        }
-
-        @Override
-        @WorkerThread
-        public boolean filter(Cursor c) {
-            if (mDisallowedProgramIds.contains(c.getLong(PROGRAM_ID_INDEX))) {
-                return false;
-            }
-            Program program = Program.fromCursor(c);
-            for (SeriesRecording seriesRecording : mSeriesRecording) {
-                boolean programMatches = seriesRecording.matchProgram(program);
-                if (programMatches && !isEpisodeScheduled(mScheduledEpisodes, new ScheduledEpisode(
-                        seriesRecording.getId(), program.getSeasonNumber(),
-                        program.getEpisodeNumber()))) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    }
-
-    private class SeriesRecordingCursorFilterForNonSystem extends SeriesRecordingCursorFilter {
-        SeriesRecordingCursorFilterForNonSystem(List<SeriesRecording> seriesRecordings,
-                Set<ScheduledEpisode> scheduledEpisodes) {
-            super(seriesRecordings, scheduledEpisodes);
-        }
-
-        @Override
-        public boolean filter(Cursor c) {
-            return c.getInt(RECORDING_PROHIBITED_INDEX) != 0 && super.filter(c);
-        }
-    }
-
-    private static class SqlParams {
-        public Uri uri;
-        public String selection;
-        public String[] selectionArgs;
-        public CursorFilter filter;
-    }
-
-    @VisibleForTesting
-    static class ScheduledEpisode {
-        public final long seriesRecordingId;
-        public final String seasonNumber;
-        public final String episodeNumber;
-
-        /**
-         * Create a new Builder with the values set from an existing {@link ScheduledRecording}.
-         */
-        ScheduledEpisode(ScheduledRecording r) {
-            this(r.getSeriesRecordingId(), r.getSeasonNumber(), r.getEpisodeNumber());
-        }
-
-        public ScheduledEpisode(long seriesRecordingId, String seasonNumber, String episodeNumber) {
-            this.seriesRecordingId = seriesRecordingId;
-            this.seasonNumber = seasonNumber;
-            this.episodeNumber = episodeNumber;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof ScheduledEpisode)) return false;
-            ScheduledEpisode that = (ScheduledEpisode) o;
-            return seriesRecordingId == that.seriesRecordingId
-                    && Objects.equals(seasonNumber, that.seasonNumber)
-                    && Objects.equals(episodeNumber, that.episodeNumber);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(seriesRecordingId, seasonNumber, episodeNumber);
-        }
 
         @Override
         public String toString() {
-            return "ScheduledEpisode{" +
-                    "seriesRecordingId=" + seriesRecordingId +
-                    ", seasonNumber='" + seasonNumber +
-                    ", episodeNumber=" + episodeNumber +
-                    '}';
+            return "SeriesRecordingUpdateTask:{"
+                    + "series_recordings=" + getSeriesRecordings()
+                    + "}";
         }
     }
 
@@ -661,10 +539,6 @@ public class SeriesRecordingScheduler {
 
         FetchSeriesInfoTask(SeriesRecording seriesRecording) {
             mSeriesRecording = seriesRecording;
-        }
-
-        String getSeriesId() {
-            return mSeriesRecording.getSeriesId();
         }
 
         @Override
@@ -697,9 +571,9 @@ public class SeriesRecordingScheduler {
     }
 
     /**
-     * Called when the program loading is finished for the series recording.
+     * A listener to notify when series recording are updated.
      */
-    public interface ProgramLoadCallback {
-        void onProgramLoadFinished(@NonNull List<Program> programs);
+    public interface OnSeriesRecordingUpdatedListener {
+        void onSeriesRecordingUpdated(SeriesRecording... seriesRecordings);
     }
 }

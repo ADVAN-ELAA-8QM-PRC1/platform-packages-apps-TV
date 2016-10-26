@@ -18,24 +18,20 @@ package com.android.tv.dvr.ui;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputManager;
-import android.os.Bundle;
-import android.support.v17.leanback.widget.Presenter;
-import android.support.v4.app.ActivityOptionsCompat;
 import android.text.TextUtils;
-import android.view.View;
 import android.view.ViewGroup;
 
-import com.android.tv.R;
 import com.android.tv.ApplicationSingletons;
+import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
 import com.android.tv.dvr.DvrDataManager;
-import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
 import com.android.tv.dvr.DvrDataManager.RecordedProgramListener;
+import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
+import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrWatchedPositionManager;
 import com.android.tv.dvr.DvrWatchedPositionManager.WatchedPositionChangedListener;
 import com.android.tv.dvr.RecordedProgram;
@@ -45,11 +41,12 @@ import com.android.tv.dvr.SeriesRecording;
 import java.util.List;
 
 /**
- * Presents a {@link SeriesRecording} in the {@link DvrBrowseFragment}.
+ * Presents a {@link SeriesRecording} in {@link DvrBrowseFragment}.
  */
-public class SeriesRecordingPresenter extends Presenter {
+public class SeriesRecordingPresenter extends DvrItemPresenter {
     private final ChannelDataManager mChannelDataManager;
     private final DvrDataManager mDvrDataManager;
+    private final DvrManager mDvrManager;
     private final DvrWatchedPositionManager mWatchedPositionManager;
 
     private static final class SeriesRecordingViewHolder extends ViewHolder implements
@@ -57,13 +54,15 @@ public class SeriesRecordingPresenter extends Presenter {
         private SeriesRecording mSeriesRecording;
         private RecordingCardView mCardView;
         private DvrDataManager mDvrDataManager;
+        private DvrManager mDvrManager;
         private DvrWatchedPositionManager mWatchedPositionManager;
 
         SeriesRecordingViewHolder(RecordingCardView view, DvrDataManager dvrDataManager,
-                DvrWatchedPositionManager watchedPositionManager) {
+                DvrManager dvrManager, DvrWatchedPositionManager watchedPositionManager) {
             super(view);
             mCardView = view;
             mDvrDataManager = dvrDataManager;
+            mDvrManager = dvrManager;
             mWatchedPositionManager = watchedPositionManager;
         }
 
@@ -96,27 +95,41 @@ public class SeriesRecordingPresenter extends Presenter {
         }
 
         @Override
-        public void onRecordedProgramAdded(RecordedProgram recordedProgram) {
-            if (TextUtils.equals(recordedProgram.getTitle(), mSeriesRecording.getTitle())) {
-                mDvrDataManager.removeScheduledRecordingListener(this);
-                mWatchedPositionManager.addListener(this, recordedProgram.getId());
-                updateCardViewContent();
-            }
-        }
-
-        @Override
-        public void onRecordedProgramRemoved(RecordedProgram recordedProgram) {
-            if (TextUtils.equals(recordedProgram.getTitle(), mSeriesRecording.getTitle())) {
-                if (mWatchedPositionManager.getWatchedPosition(recordedProgram.getId())
-                        == TvInputManager.TIME_SHIFT_INVALID_TIME) {
-                    mWatchedPositionManager.removeListener(this, recordedProgram.getId());
+        public void onRecordedProgramsAdded(RecordedProgram... recordedPrograms) {
+            boolean needToUpdateCardView = false;
+            for (RecordedProgram recordedProgram : recordedPrograms) {
+                if (TextUtils.equals(recordedProgram.getSeriesId(),
+                        mSeriesRecording.getSeriesId())) {
+                    mDvrDataManager.removeScheduledRecordingListener(this);
+                    mWatchedPositionManager.addListener(this, recordedProgram.getId());
+                    needToUpdateCardView = true;
                 }
+            }
+            if (needToUpdateCardView) {
                 updateCardViewContent();
             }
         }
 
         @Override
-        public void onRecordedProgramChanged(RecordedProgram recordedProgram) {
+        public void onRecordedProgramsRemoved(RecordedProgram... recordedPrograms) {
+            boolean needToUpdateCardView = false;
+            for (RecordedProgram recordedProgram : recordedPrograms) {
+                if (TextUtils.equals(recordedProgram.getSeriesId(),
+                        mSeriesRecording.getSeriesId())) {
+                    if (mWatchedPositionManager.getWatchedPosition(recordedProgram.getId())
+                            == TvInputManager.TIME_SHIFT_INVALID_TIME) {
+                        mWatchedPositionManager.removeListener(this, recordedProgram.getId());
+                    }
+                    needToUpdateCardView = true;
+                }
+            }
+            if (needToUpdateCardView) {
+                updateCardViewContent();
+            }
+        }
+
+        @Override
+        public void onRecordedProgramsChanged(RecordedProgram... recordedPrograms) {
             // Do nothing
         }
 
@@ -151,7 +164,7 @@ public class SeriesRecordingPresenter extends Presenter {
             List<RecordedProgram> recordedPrograms =
                     mDvrDataManager.getRecordedPrograms(mSeriesRecording.getId());
             if (recordedPrograms.size() == 0) {
-                count = mDvrDataManager.getScheduledRecordings(mSeriesRecording.getId()).size();
+                count = mDvrManager.getAvailableScheduledRecording(mSeriesRecording.getId()).size();
                 quantityStringID = R.plurals.dvr_count_scheduled_recordings;
             } else {
                 for (RecordedProgram recordedProgram : recordedPrograms) {
@@ -176,6 +189,7 @@ public class SeriesRecordingPresenter extends Presenter {
         ApplicationSingletons singletons = TvApplication.getSingletons(context);
         mChannelDataManager = singletons.getChannelDataManager();
         mDvrDataManager = singletons.getDvrDataManager();
+        mDvrManager = singletons.getDvrManager();
         mWatchedPositionManager = singletons.getDvrWatchedPositionManager();
     }
 
@@ -183,7 +197,8 @@ public class SeriesRecordingPresenter extends Presenter {
     public ViewHolder onCreateViewHolder(ViewGroup parent) {
         Context context = parent.getContext();
         RecordingCardView view = new RecordingCardView(context);
-        return new SeriesRecordingViewHolder(view, mDvrDataManager, mWatchedPositionManager);
+        return new SeriesRecordingViewHolder(view, mDvrDataManager, mDvrManager,
+                mWatchedPositionManager);
     }
 
     @Override
@@ -193,33 +208,14 @@ public class SeriesRecordingPresenter extends Presenter {
         final RecordingCardView cardView = (RecordingCardView) viewHolder.view;
         viewHolder.onBound(seriesRecording);
         setTitleAndImage(cardView, seriesRecording);
-        View.OnClickListener clickListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showSeriesRecordingDetails(v, seriesRecording);
-            }
-        };
-        baseHolder.view.setOnClickListener(clickListener);
-    }
-
-    private void showSeriesRecordingDetails(View view, SeriesRecording seriesRecording) {
-        if (view instanceof RecordingCardView) {
-            Context context = view.getContext();
-            Intent intent = new Intent(context, DvrDetailsActivity.class);
-            intent.putExtra(DvrDetailsActivity.RECORDING_ID, seriesRecording.getId());
-            intent.putExtra(DvrDetailsActivity.DETAILS_VIEW_TYPE,
-                    DvrDetailsActivity.SERIES_RECORDING_VIEW);
-            Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation((Activity) context,
-                    ((RecordingCardView) view).getImageView(),
-                    DvrDetailsActivity.SHARED_ELEMENT_NAME).toBundle();
-            context.startActivity(intent, bundle);
-        }
+        super.onBindViewHolder(baseHolder, o);
     }
 
     @Override
     public void onUnbindViewHolder(ViewHolder viewHolder) {
         ((RecordingCardView) viewHolder.view).reset();
         ((SeriesRecordingViewHolder) viewHolder).onUnbound();
+        super.onUnbindViewHolder(viewHolder);
     }
 
     private void setTitleAndImage(RecordingCardView cardView, SeriesRecording recording) {

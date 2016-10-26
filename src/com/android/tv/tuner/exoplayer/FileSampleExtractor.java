@@ -55,6 +55,11 @@ public class FileSampleExtractor implements SampleExtractor{
     }
 
     @Override
+    public void maybeThrowError() throws IOException {
+        // Do nothing.
+    }
+
+    @Override
     public boolean prepare() throws IOException {
         ArrayList<Pair<String, android.media.MediaFormat>> trackInfos =
                 mBufferManager.readTrackInfoFiles();

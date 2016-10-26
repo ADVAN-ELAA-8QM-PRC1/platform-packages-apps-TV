@@ -38,8 +38,6 @@ public class TunerPreferenceProvider extends ContentProvider {
     private static final int DATABASE_VERSION = 1;
     private static final String DATABASE_NAME = "usbtuner_preferences.db";
     private static final String PREFERENCES_TABLE = "preferences";
-    private static final String PREFERENCES_TABLE_ID_INDEX = "preferences_id_index";
-    private static final String PREFERENCES_TABLE_KEY_INDEX = "preferences_key_index";
 
     private static final int MATCH_PREFERENCE = 1;
     private static final int MATCH_PREFERENCE_KEY = 2;

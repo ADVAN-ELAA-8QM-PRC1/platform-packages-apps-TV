@@ -62,7 +62,6 @@ import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.data.Channel;
 import com.android.tv.data.StreamInfo;
 import com.android.tv.data.WatchedHistoryManager;
-import com.android.tv.dvr.DvrManager;
 import com.android.tv.parental.ContentRatingsManager;
 import com.android.tv.recommendation.NotificationService;
 import com.android.tv.util.NetworkUtils;
@@ -171,7 +170,6 @@ public class TunableTvView extends FrameLayout implements StreamInfo {
 
     @BlockScreenType private int mBlockScreenType;
 
-    private final DvrManager mDvrManager;
     private final TvInputManagerHelper mInputManager;
     private final ConnectivityManager mConnectivityManager;
     private final InputSessionManager mInputSessionManager;
@@ -352,10 +350,8 @@ public class TunableTvView extends FrameLayout implements StreamInfo {
 
         ApplicationSingletons appSingletons = TvApplication.getSingletons(context);
         if (CommonFeatures.DVR.isEnabled(context)) {
-            mDvrManager = appSingletons.getDvrManager();
             mInputSessionManager = appSingletons.getInputSessionManager();
         } else {
-            mDvrManager = null;
             mInputSessionManager = null;
         }
         mInputManager = appSingletons.getTvInputManagerHelper();
@@ -764,6 +760,7 @@ public class TunableTvView extends FrameLayout implements StreamInfo {
     /**
      * Returns currently blocked content rating. {@code null} if it's not blocked.
      */
+    @Override
     public TvContentRating getBlockedContentRating() {
         return mBlockedContentRating;
     }
@@ -1005,6 +1002,12 @@ public class TunableTvView extends FrameLayout implements StreamInfo {
                 mute();
                 break;
             case TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING:
+                mHideScreenView.setVisibility(VISIBLE);
+                mHideScreenView.setImageVisibility(false);
+                mHideScreenView.setText(null);
+                mBufferingSpinnerView.setVisibility(VISIBLE);
+                mute();
+                break;
             case VIDEO_UNAVAILABLE_REASON_NOT_TUNED:
                 mHideScreenView.setVisibility(VISIBLE);
                 mHideScreenView.setImageVisibility(false);
@@ -1035,12 +1038,14 @@ public class TunableTvView extends FrameLayout implements StreamInfo {
     }
 
     private String getTuneConflictMessage(String inputId) {
-        if (mDvrManager != null && inputId != null) {
+        if (inputId != null) {
             TvInputInfo input = mInputManager.getTvInputInfo(inputId);
-            long time = mDvrManager.getEarliestRecordingEndTime(inputId);
-            return getResources().getQuantityString(R.plurals.tvview_msg_input_no_resource,
-                    input.getTunerCount(),
-                    DateUtils.formatDateTime(getContext(), time, DateUtils.FORMAT_SHOW_TIME));
+            Long timeMs = mInputSessionManager.getEarliestRecordingSessionEndTimeMs(inputId);
+            if (timeMs != null) {
+                return getResources().getQuantityString(R.plurals.tvview_msg_input_no_resource,
+                        input.getTunerCount(),
+                        DateUtils.formatDateTime(getContext(), timeMs, DateUtils.FORMAT_SHOW_TIME));
+            }
         }
         return null;
     }

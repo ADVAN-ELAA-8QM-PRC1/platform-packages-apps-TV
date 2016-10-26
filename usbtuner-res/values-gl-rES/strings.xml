@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"Produciuse un erro ao sintonizar <xliff:g id="CHANNEL_NAME">%s</xliff:g>"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"Produciuse un erro ao sintonizar"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"O software do sintonizador actualizouse recentemente. Volve buscar canles."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"Non está dispoñible o audio AC3"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"Activa o son envolvente na configuración de son do sistema para activar o audio"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"Configuración do sintonizador de canles"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"Configuración do sintonizador de televisión"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"Configuración do sintonizador de canles USB"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"Configuración do sintonizador de televisión"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"Configuración do sintonizador de canles USB"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"Esta acción pode tardar varios minutos"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"O sintonizador non está dispoñible temporalmente ou xa se utiliza para unha gravación."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">Atopáronse %1$d canles</item>
       <item quantity="one">Atopouse %1$d canle</item>

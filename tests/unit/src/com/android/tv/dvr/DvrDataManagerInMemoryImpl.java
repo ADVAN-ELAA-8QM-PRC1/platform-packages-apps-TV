@@ -64,7 +64,7 @@ final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
     }
 
     private List<ScheduledRecording> getScheduledRecordingsPrograms() {
-        return new ArrayList(mScheduledRecordings.values());
+        return new ArrayList<>(mScheduledRecordings.values());
     }
 
     @Override
@@ -159,7 +159,7 @@ final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
         long id = r.getId();
         if (mRecordedPrograms.containsKey(id)) {
             mRecordedPrograms.put(id, r);
-            notifyRecordedProgramChanged(r);
+            notifyRecordedProgramsChanged(r);
         } else {
             throw new IllegalArgumentException("Recording not found:" + r);
         }
@@ -167,7 +167,7 @@ final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
 
     public void removeRecordedProgram(RecordedProgram scheduledRecording) {
         mRecordedPrograms.remove(scheduledRecording.getId());
-        notifyRecordedProgramRemoved(scheduledRecording);
+        notifyRecordedProgramsRemoved(scheduledRecording);
     }
 
 
@@ -191,7 +191,7 @@ final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
                 .setId(mNextId.incrementAndGet())
                 .build();
         mRecordedPrograms.put(recordedProgram.getId(), recordedProgram);
-        notifyRecordedProgramAdded(recordedProgram);
+        notifyRecordedProgramsAdded(recordedProgram);
         return recordedProgram;
     }
 
@@ -209,6 +209,11 @@ final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
             mScheduledRecordings.remove(r.getId());
         }
         notifyScheduledRecordingRemoved(scheduledRecordings);
+    }
+
+    @Override
+    public void removeScheduledRecording(boolean forceRemove, ScheduledRecording... schedule) {
+        removeScheduledRecording(schedule);
     }
 
     @Override

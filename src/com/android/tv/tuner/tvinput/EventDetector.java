@@ -20,7 +20,6 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 
-import com.android.tv.tuner.TunerFlags;
 import com.android.tv.tuner.TunerHal;
 import com.android.tv.tuner.data.Track.AtscAudioTrack;
 import com.android.tv.tuner.data.Track.AtscCaptionTrack;
@@ -39,7 +38,6 @@ import java.util.Set;
  */
 public class EventDetector {
     private static final String TAG = "EventDetector";
-    private static final String CABLE_MODULATION = "QAM";
     private static final boolean DEBUG = false;
     public static final int ALL_PROGRAM_NUMBERS = -1;
 
@@ -62,12 +60,7 @@ public class EventDetector {
         @Override
         public void onPatDetected(List<PsiData.PatItem> items) {
             for (PsiData.PatItem i : items) {
-                // In case of tuning to a cable channel, we don't add filters for EPG update for
-                // other channels due to b/29490412. We do the same when extractor in ExoPlayer is
-                // used since it doesn't allow PMTs not related to the channel to play.
-                if (mProgramNumber == ALL_PROGRAM_NUMBERS || mProgramNumber == i.getProgramNo()
-                        || (!mModulation.startsWith(CABLE_MODULATION)
-                                && !TunerFlags.USE_EXTRACTOR_IN_EXOPLAYER)) {
+                if (mProgramNumber == ALL_PROGRAM_NUMBERS || mProgramNumber == i.getProgramNo()) {
                     mTunerHal.addPidFilter(i.getPmtPid(), TunerHal.FILTER_TYPE_OTHER);
                 }
             }

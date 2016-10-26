@@ -532,6 +532,13 @@ public class SectionParser {
         int numChannelsInSection = (data[9] & 0xff);
         int sectionNumber = (data[6] & 0xff);
         int lastSectionNumber = (data[7] & 0xff);
+        if (sectionNumber > lastSectionNumber) {
+            // According to section 6.3.1 of the spec ATSC A/65,
+            // last section number is the largest section number.
+            Log.w(TAG, "Invalid VCT. Section Number " + sectionNumber + " > Last Section Number "
+                    + lastSectionNumber);
+            return false;
+        }
         int pos = 10;
         List<VctItem> results = new ArrayList<>();
         for (int i = 0; i < numChannelsInSection; ++i) {

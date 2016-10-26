@@ -20,9 +20,10 @@ import android.os.Environment;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 
+import com.google.android.exoplayer.C;
+import com.google.android.exoplayer.upstream.DataSpec;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.tuner.ChannelScanFileParser.ScanChannel;
-import com.android.tv.tuner.TunerFlags;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.ts.TsParser;
 import com.android.tv.tuner.tvinput.EventDetector;
@@ -67,28 +68,14 @@ public class FileTsStreamer implements TsStreamer {
     private Thread mStreamingThread;
     private StreamProvider mSource;
 
-    public static class FileMediaDataSource extends TsMediaDataSource {
+    public static class FileDataSource extends TsDataSource {
         private final FileTsStreamer mTsStreamer;
         private final AtomicLong mLastReadPosition = new AtomicLong(0);
         private long mStartBufferedPosition;
 
-        private FileMediaDataSource(FileTsStreamer tsStreamer) {
+        private FileDataSource(FileTsStreamer tsStreamer) {
             mTsStreamer = tsStreamer;
             mStartBufferedPosition = tsStreamer.getBufferedPosition();
-        }
-
-        @Override
-        public int readAt(long pos, byte[] buffer, int offset, int amount) throws IOException {
-            int ret = mTsStreamer.readAt(mStartBufferedPosition + pos, buffer, offset, amount);
-            if (ret > 0) {
-                mLastReadPosition.set(pos + ret);
-            }
-            return ret;
-        }
-
-        @Override
-        public long getSize() {
-            return -1L;
         }
 
         @Override
@@ -108,9 +95,24 @@ public class FileTsStreamer implements TsStreamer {
             mStartBufferedPosition += offset;
         }
 
-        // This will be called by {@link MediaExtractor}
+        @Override
+        public long open(DataSpec dataSpec) throws IOException {
+            mLastReadPosition.set(0);
+            return C.LENGTH_UNBOUNDED;
+        }
+
         @Override
         public void close() {
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int readLength) throws IOException {
+            int ret = mTsStreamer.readAt(mStartBufferedPosition + mLastReadPosition.get(), buffer,
+                    offset, readLength);
+            if (ret > 0) {
+                mLastReadPosition.addAndGet(ret);
+            }
+            return ret;
         }
     }
 
@@ -154,13 +156,8 @@ public class FileTsStreamer implements TsStreamer {
         }
         mEventDetector.start(mSource, channel.getProgramNumber());
         mSource.addPidFilter(channel.getVideoPid());
-        if (TunerFlags.USE_EXTRACTOR_IN_EXOPLAYER) {
-            // ExoPlayer's extractor expects all the tracks which belong to the channel.
-            for (Integer i : channel.getAudioPids()) {
-                mSource.addPidFilter(i);
-            }
-        } else {
-            mSource.addPidFilter(channel.getAudioPid());
+        for (Integer i : channel.getAudioPids()) {
+            mSource.addPidFilter(i);
         }
         mSource.addPidFilter(channel.getPcrPid());
         mSource.addPidFilter(TsParser.ATSC_SI_BASE_PID);
@@ -199,8 +196,8 @@ public class FileTsStreamer implements TsStreamer {
     }
 
     @Override
-    public TsMediaDataSource createMediaDataSource() {
-        return new FileMediaDataSource(this);
+    public TsDataSource createDataSource() {
+        return new FileDataSource(this);
     }
 
     /**

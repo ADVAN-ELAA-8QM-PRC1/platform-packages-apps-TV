@@ -44,6 +44,7 @@ import com.android.tv.tuner.data.Cea708Data.CaptionEvent;
 import com.android.tv.tuner.data.Track.AtscCaptionTrack;
 import com.android.tv.tuner.exoplayer.buffer.BufferManager;
 import com.android.tv.tuner.data.TunerChannel;
+import com.android.tv.tuner.util.GlobalSettingsUtils;
 import com.android.tv.tuner.util.StatusTextUtils;
 import com.android.tv.tuner.util.SystemPropertiesProxy;
 
@@ -97,7 +98,7 @@ public class TunerSession extends TvInputService.Session implements Handler.Call
         mAudioStatusView = (TextView) mOverlayView.findViewById(R.id.audio_status);
         mAudioStatusView.setVisibility(View.INVISIBLE);
         mAudioStatusView.setText(Html.fromHtml(StatusTextUtils.getAudioWarningInHTML(
-                context.getString(R.string.ut_ac3_passthrough_unavailable))));
+                context.getString(R.string.ut_surround_sound_disabled))));
         CaptionLayout captionLayout = (CaptionLayout) mOverlayView.findViewById(R.id.caption);
         mCaptionTrackRenderer = new CaptionTrackRenderer(captionLayout);
         mSessionWorker = new TunerSessionWorker(context, channelDataManager,
@@ -267,7 +268,14 @@ public class TunerSession extends TvInputService.Session implements Handler.Call
                 return true;
             }
             case MSG_UI_SHOW_AUDIO_UNPLAYABLE: {
-                mAudioStatusView.setVisibility(View.VISIBLE);
+                // Showing message of enabling surround sound only when global surround sound
+                // setting is "never".
+                final int value = GlobalSettingsUtils.getEncodedSurroundOutputSettings(mContext);
+                if (value == GlobalSettingsUtils.ENCODED_SURROUND_OUTPUT_NEVER) {
+                    mAudioStatusView.setVisibility(View.VISIBLE);
+                } else {
+                    Log.e(TAG, "Audio is unavailable, surround sound setting is " + value);
+                }
                 return true;
             }
             case MSG_UI_HIDE_AUDIO_UNPLAYABLE: {

@@ -354,13 +354,15 @@
     <dimen name="dvr_schedules_item_conflict_info_top_margin">12dp</dimen>
     <dimen name="dvr_schedules_item_conflict_info_bottom_margin">15dp</dimen>
     <dimen name="dvr_schedules_item_schedule_width">56dp</dimen>
-    <dimen name="dvr_schedules_item_delete_width">78dp</dimen>
-    <dimen name="dvr_schedules_item_delete_right_padding">32dp</dimen>
+    <dimen name="dvr_schedules_item_delete_width">46dp</dimen>
+    <dimen name="dvr_schedules_item_section_margin">32dp</dimen>
     <dimen name="dvr_schedules_item_icon_size">18dp</dimen>
+    <dimen name="dvr_schedules_item_focus_translation_delta">2dp</dimen>
+    <dimen name="dvr_schedules_item_focus_width_delta">10dp</dimen>
     <dimen name="dvr_schedules_header_margin_top">32dp</dimen>
     <dimen name="dvr_schedules_header_margin_bottom">24dp</dimen>
     <dimen name="dvr_schedules_header_subtitle_margin_top">5dp</dimen>
-    <dimen name="dvr_schedules_header_icon_container_width">142dp</dimen>
+    <dimen name="dvr_schedules_header_icon_container_width">143dp</dimen>
     <dimen name="dvr_schedules_header_icon_size">32dp</dimen>
     <dimen name="dvr_schedules_header_icon_horizontal_margin">12dp</dimen>
     <dimen name="dvr_schedules_warning_icon_padding">4dp</dimen>
@@ -388,6 +390,8 @@
     <item name="dvr_conflict_guidedstep_keyline" format="float" type="string">30.0</item>
     <dimen name="dvr_deletion_check_mark_size">32dp</dimen>
     <dimen name="dvr_deletion_check_mark_margin">20dp</dimen>
+    <dimen name="dvr_details_overview_description_margin_start">12dp</dimen>
+    <dimen name="dvr_details_overview_description_margin_end">12dp</dimen>
     <!-- Below values are used to avoid detail titles' layout changing with two-line titles -->
     <dimen name="dvr_details_description_title_resized_text_size">34sp</dimen>
     <dimen name="dvr_details_description_title_padding_adjust_top">0dp</dimen>

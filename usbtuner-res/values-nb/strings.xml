@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"Kunne ikke bytte kanal til <xliff:g id="CHANNEL_NAME">%s</xliff:g>"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"Kunne ikke bytte kanal"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"Programvaren for tuneren er nylig blitt oppdatert. Du må skanne kanalene på nytt."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"AC3-lyd er ikke tilgjengelig"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"Slå på surroundlyd i innstillingene for systemlyd for å slå på lyd"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"Konfigurasjon av kanaler via tuneren"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"Konfigurasjon av TV-tuneren"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"Konfigurasjon av kanaler via USB-tuneren"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"Konfigurasjon av TV-tuneren"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"Konfigurasjon av kanaler via USB-tuneren"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"Dette kan ta flere minutter"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"Tuneren er midlertidig utilgjengelig eller brukes allerede av opptak."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">%1$d kanaler er funnet</item>
       <item quantity="one">%1$d kanal er funnet</item>

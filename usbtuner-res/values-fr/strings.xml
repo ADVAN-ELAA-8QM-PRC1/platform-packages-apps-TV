@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"Échec de sélection de la chaîne <xliff:g id="CHANNEL_NAME">%s</xliff:g>"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"Échec de la sélection de la chaîne"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"Le logiciel du tuner a été mis à jour récemment. Veuillez lancer une nouvelle recherche des chaînes."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"Audio au format AC3 indisponible"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"Activer le son surround dans les paramètres sonores du système pour activer l\'audio"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"Configuration du tuner de chaînes"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"Configuration du tuner TV"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"Configuration du tuner de chaînes USB"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"Configuration du tuner TV"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"Configuration du tuner de chaînes USB"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"Cette opération peut prendre plusieurs minutes."</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"Le tuner est temporairement indisponible ou est déjà utilisé pour l\'enregistrement."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="one">%1$d chaîne a été détectée.</item>
       <item quantity="other">%1$d chaînes ont été détectées.</item>

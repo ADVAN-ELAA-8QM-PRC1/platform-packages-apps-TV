@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"ປັບຫາ <xliff:g id="CHANNEL_NAME">%s</xliff:g> ບໍ່ສຳເລັດ"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"ປັບຊ່ອງບໍ່ສຳເລັດ"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"ຊອບແວຕົວປັບສັນຍານໄດ້ຮັບການອັບເດດເມື່ອບໍ່ດົນມານີ້ແລ້ວ. ກະລຸນາສະແກນຫາຊ່ອງຄືນໃໝ່."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"ບໍ່ມີສຽງ AC3 ຢູ່"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"ເປີດໃຊ້ສຽງຮອບທິດທາງໃນການຕັ້ງຄ່າລະບົບສຽງເພື່ອເປີດໃຊ້ສຽງ."</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"ຕັ້ງເຄື່ອງຮັບສັນຍານຊ່ອງ"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"ຕັ້ງຄ່າຕົວຮັບສັນຍານໂທລະພາບ"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"ຕັ້ງເຄື່ອງຮັບສັນຍານຊ່ອງ USB"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"ຕັ້ງຄ່າຕົວຮັບສັນຍານໂທລະພາບ"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"ການຕັ້ງເຄື່ອງຮັບສັນຍານຊ່ອງ USB"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"ຂັ້ນຕອນນີ້ອາດຈະໃຊ້ເວລາຫຼາຍນາທີ"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"ຈູນເນີບໍ່ສາມາດໃຊ້ໄດ້ຊົ່ວຄາວ ຫຼື ຖືກໃຊ້ໂດຍການບັນທຶກໃດໜຶ່ງຢູ່ກ່ອນແລ້ວ."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">ພົບ %1$d ຊ່ອງ</item>
       <item quantity="one">ພົບ %1$d ຊ່ອງ</item>

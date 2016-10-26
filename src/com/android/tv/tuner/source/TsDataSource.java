@@ -16,12 +16,12 @@
 
 package com.android.tv.tuner.source;
 
-import android.media.MediaDataSource;
+import com.google.android.exoplayer.upstream.DataSource;
 
 /**
- * {@link MediaDatasource} for MPEG-TS stream, which will be used by {@link MediaExtractor}.
+ * {@link DataSource} for MPEG-TS stream, which will be used by {@link TsExtractor}.
  */
-public abstract class TsMediaDataSource extends MediaDataSource {
+public abstract class TsDataSource implements DataSource {
 
     /**
      * Returns the number of bytes being buffered by {@link TsStreamer} so far.
@@ -33,7 +33,7 @@ public abstract class TsMediaDataSource extends MediaDataSource {
     }
 
     /**
-     * Returns the offset position where the last {@link MediaDataSource#readAt} read.
+     * Returns the offset position where the last {@link DataSource#read} read.
      *
      * @return the last read position
      */

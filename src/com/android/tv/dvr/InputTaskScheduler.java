@@ -21,7 +21,6 @@ import android.media.tv.TvInputInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.support.annotation.MainThread;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
 import android.util.ArrayMap;
@@ -32,9 +31,11 @@ import com.android.tv.InputSessionManager;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
 import com.android.tv.util.Clock;
+import com.android.tv.util.CompositeComparator;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,6 @@ import java.util.Map;
 /**
  * The scheduler for a TV input.
  */
-@MainThread
 public class InputTaskScheduler {
     private static final String TAG = "InputTaskScheduler";
     private static final boolean DEBUG = false;
@@ -51,6 +51,24 @@ public class InputTaskScheduler {
     private static final int MSG_REMOVE_SCHEDULED_RECORDING = 2;
     private static final int MSG_UPDATE_SCHEDULED_RECORDING = 3;
     private static final int MSG_BUILD_SCHEDULE = 4;
+    private static final int MSG_STOP_SCHEDULE = 5;
+
+    private static final float MIN_REMAIN_DURATION_PERCENT = 0.05f;
+
+    // The candidate comparator should be the consistent with
+    // DvrScheduleManager#CANDIDATE_COMPARATOR.
+    private static final Comparator<RecordingTask> CANDIDATE_COMPARATOR =
+            new CompositeComparator<>(
+                    RecordingTask.PRIORITY_COMPARATOR,
+                    RecordingTask.END_TIME_COMPARATOR,
+                    RecordingTask.ID_COMPARATOR);
+
+    /**
+     * Returns the comparator which the schedules are sorted with when executed.
+     */
+    public static Comparator<ScheduledRecording> getRecordingOrderComparator() {
+        return ScheduledRecording.START_TIME_THEN_PRIORITY_THEN_ID_COMPARATOR;
+    }
 
     /**
      * Wraps a {@link RecordingTask} removing it from {@link #mPendingRecordings} when it is done.
@@ -217,6 +235,23 @@ public class InputTaskScheduler {
         }
     }
 
+    /**
+     * Stops the input task scheduler.
+     */
+    public void stop() {
+        mHandler.removeCallbacksAndMessages(null);
+        mHandler.sendEmptyMessage(MSG_STOP_SCHEDULE);
+    }
+
+    private void handleStopSchedule() {
+        mWaitingSchedules.clear();
+        int size = mPendingRecordings.size();
+        for (int i = 0; i < size; ++i) {
+            RecordingTask task = mPendingRecordings.get(mPendingRecordings.keyAt(i)).mTask;
+            task.cleanUp();
+        }
+    }
+
     @VisibleForTesting
     void handleBuildSchedule() {
         if (mWaitingSchedules.isEmpty()) {
@@ -227,7 +262,8 @@ public class InputTaskScheduler {
         for (Iterator<ScheduledRecording> iter = mWaitingSchedules.values().iterator();
                 iter.hasNext(); ) {
             ScheduledRecording schedule = iter.next();
-            if (schedule.getEndTimeMs() <= currentTimeMs) {
+            if (schedule.getEndTimeMs() - currentTimeMs
+                    <= MIN_REMAIN_DURATION_PERCENT * schedule.getDuration()) {
                 fail(schedule);
                 iter.remove();
             }
@@ -244,7 +280,13 @@ public class InputTaskScheduler {
                 schedulesToStart.add(schedule);
             }
         }
-        Collections.sort(schedulesToStart, ScheduledRecording.START_TIME_THEN_PRIORITY_COMPARATOR);
+        // The schedules will be executed with the following order.
+        // 1. The schedule which starts early. It can be replaced later when the schedule with the
+        //    higher priority needs to start.
+        // 2. The schedule with the higher priority. It can be replaced later when the schedule with
+        //    the higher priority needs to start.
+        // 3. The schedule which was created recently.
+        Collections.sort(schedulesToStart, getRecordingOrderComparator());
         int tunerCount;
         synchronized (mInputLock) {
             tunerCount = mInput.canRecord() ? mInput.getTunerCount() : 0;
@@ -266,11 +308,6 @@ public class InputTaskScheduler {
                     task.stop();
                     // Just return. The schedules will be rebuilt after the task is stopped.
                     return;
-                } else {
-                    // TODO: Do not fail immediately. Start the recording later when available.
-                    // There are no replaceable task. Remove it.
-                    fail(schedule);
-                    mWaitingSchedules.remove(schedule.getId());
                 }
             }
         }
@@ -280,12 +317,20 @@ public class InputTaskScheduler {
         // Set next scheduling.
         long earliest = Long.MAX_VALUE;
         for (ScheduledRecording schedule : mWaitingSchedules.values()) {
-            if (earliest > schedule.getStartTimeMs()) {
-                earliest = schedule.getStartTimeMs();
+            // The conflicting schedules will be removed if they end before conflicting resolved.
+            if (schedulesToStart.contains(schedule)) {
+                if (earliest > schedule.getEndTimeMs()) {
+                    earliest = schedule.getEndTimeMs();
+                }
+            } else {
+                if (earliest > schedule.getStartTimeMs()
+                        - RecordingTask.RECORDING_EARLY_START_OFFSET_MS) {
+                    earliest = schedule.getStartTimeMs()
+                            - RecordingTask.RECORDING_EARLY_START_OFFSET_MS;
+                }
             }
         }
-        mHandler.sendEmptyMessageDelayed(MSG_BUILD_SCHEDULE, earliest
-                - RecordingTask.RECORDING_EARLY_START_OFFSET_MS - currentTimeMs);
+        mHandler.sendEmptyMessageDelayed(MSG_BUILD_SCHEDULE, earliest - currentTimeMs);
     }
 
     private RecordingTask createRecordingTask(ScheduledRecording schedule) {
@@ -309,13 +354,18 @@ public class InputTaskScheduler {
     }
 
     private RecordingTask getReplacableTask(ScheduledRecording schedule) {
+        // Returns the recording with the following priority.
+        // 1. The recording with the lowest priority is returned.
+        // 2. If the priorities are the same, the recording which finishes early is returned.
+        // 3. If 1) and 2) are the same, the early created schedule is returned.
         int size = mPendingRecordings.size();
         RecordingTask candidate = null;
         for (int i = 0; i < size; ++i) {
             RecordingTask task = mPendingRecordings.get(mPendingRecordings.keyAt(i)).mTask;
-            if (schedule.getPriority() > task.getPriority()
-                    && (candidate == null || candidate.getPriority() > task.getPriority())) {
-                candidate = task;
+            if (schedule.getPriority() > task.getPriority()) {
+                if (candidate == null || CANDIDATE_COMPARATOR.compare(candidate, task) > 0) {
+                    candidate = task;
+                }
             }
         }
         return candidate;
@@ -371,6 +421,9 @@ public class InputTaskScheduler {
                     handleUpdateSchedule((ScheduledRecording) msg.obj);
                 case MSG_BUILD_SCHEDULE:
                     handleBuildSchedule();
+                    break;
+                case MSG_STOP_SCHEDULE:
+                    handleStopSchedule();
                     break;
             }
         }

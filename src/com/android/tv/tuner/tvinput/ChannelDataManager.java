@@ -39,6 +39,8 @@ import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.util.ConvertUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,6 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -76,8 +77,7 @@ public class ChannelDataManager implements Handler.Callback {
     private static final int MSG_BUILD_CHANNEL_MAP = 3;
     private static final int MSG_REQUEST_PROGRAMS = 4;
     private static final int MSG_CLEAR_CHANNELS = 6;
-    private static final int MSG_SCAN_COMPLETED = 7;
-    private static final int MSG_CHECK_VERSION = 8;
+    private static final int MSG_CHECK_VERSION = 7;
 
     // Throttle the batch operations to avoid TransactionTooLargeException.
     private static final int BATCH_OPERATION_COUNT = 100;
@@ -97,6 +97,8 @@ public class ChannelDataManager implements Handler.Callback {
     private final Context mContext;
     private final String mInputId;
     private ProgramInfoListener mListener;
+    private ChannelScanListener mChannelScanListener;
+    private Handler mChannelScanHandler;
     private final HandlerThread mHandlerThread;
     private final Handler mHandler;
     private final ConcurrentHashMap<Long, TunerChannel> mTunerChannelMap;
@@ -107,7 +109,7 @@ public class ChannelDataManager implements Handler.Callback {
     private final ConcurrentSkipListSet<TunerChannel> mScannedChannels;
     private final ConcurrentSkipListSet<TunerChannel> mPreviousScannedChannels;
     private final AtomicBoolean mIsScanning;
-    private CountDownLatch mScanLatch;
+    private final AtomicBoolean scanCompleted = new AtomicBoolean();
 
     public interface ProgramInfoListener {
 
@@ -133,6 +135,13 @@ public class ChannelDataManager implements Handler.Callback {
          * deleted. A receiver should notify to a user that re-scanning channels is necessary.
          */
         void onRescanNeeded();
+    }
+
+    public interface ChannelScanListener {
+        /**
+         * Invoked when all pending channels have been handled.
+         */
+        void onChannelHandlingDone();
     }
 
     public ChannelDataManager(Context context) {
@@ -176,8 +185,17 @@ public class ChannelDataManager implements Handler.Callback {
         mListener = listener;
     }
 
+    public void setChannelScanListener(ChannelScanListener listener, Handler handler) {
+        mChannelScanListener = listener;
+        mChannelScanHandler = handler;
+    }
+
     public void release() {
         mHandler.removeCallbacksAndMessages(null);
+        mHandlerThread.quitSafely();
+    }
+
+    public void releaseSafely() {
         mHandlerThread.quitSafely();
     }
 
@@ -215,7 +233,13 @@ public class ChannelDataManager implements Handler.Callback {
     }
 
     public void notifyChannelDetected(TunerChannel channel, boolean channelArrivedAtFirstTime) {
-        mHandler.obtainMessage(MSG_HANDLE_CHANNEL, channel).sendToTarget();
+        if (mIsScanning.get()) {
+            // During scanning, channels should be handle first to improve scan time.
+            // EIT items can be handled in background after channel scan.
+            mHandler.sendMessageAtFrontOfQueue(mHandler.obtainMessage(MSG_HANDLE_CHANNEL, channel));
+        } else {
+            mHandler.obtainMessage(MSG_HANDLE_CHANNEL, channel).sendToTarget();
+        }
     }
 
     // For scanning process
@@ -249,26 +273,35 @@ public class ChannelDataManager implements Handler.Callback {
      * obsolete channels, which are previously scanned but are not in the current scanned result.
      */
     public void notifyScanCompleted() {
-        mScanLatch = new CountDownLatch(1);
-        mHandler.sendEmptyMessage(MSG_SCAN_COMPLETED);
-        try {
-            mScanLatch.await();
-        } catch (InterruptedException e) {
-            Log.e(TAG, "Scanning process could not finish", e);
-        }
+        // Send a dummy message to check whether there is any MSG_HANDLE_CHANNEL in queue
+        // and avoid race conditions.
+        scanCompleted.set(true);
+        mHandler.sendMessageAtFrontOfQueue(mHandler.obtainMessage(MSG_HANDLE_CHANNEL, null));
+    }
+
+    public void scannedChannelHandlingCompleted() {
         mIsScanning.set(false);
-        if (mPreviousScannedChannels.isEmpty()) {
-            return;
+        if (!mPreviousScannedChannels.isEmpty()) {
+            ArrayList<ContentProviderOperation> ops = new ArrayList<>();
+            for (TunerChannel channel : mPreviousScannedChannels) {
+                ops.add(ContentProviderOperation.newDelete(
+                        TvContract.buildChannelUri(channel.getChannelId())).build());
+            }
+            try {
+                mContext.getContentResolver().applyBatch(TvContract.AUTHORITY, ops);
+            } catch (RemoteException | OperationApplicationException e) {
+                Log.e(TAG, "Error deleting obsolete channels", e);
+            }
         }
-        ArrayList<ContentProviderOperation> ops = new ArrayList<>();
-        for (TunerChannel channel : mPreviousScannedChannels) {
-            ops.add(ContentProviderOperation.newDelete(
-                    TvContract.buildChannelUri(channel.getChannelId())).build());
-        }
-        try {
-            mContext.getContentResolver().applyBatch(TvContract.AUTHORITY, ops);
-        } catch (RemoteException | OperationApplicationException e) {
-            Log.e(TAG, "Error deleting obsolete channels", e);
+        if (mChannelScanListener != null && mChannelScanHandler != null) {
+            mChannelScanHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mChannelScanListener.onChannelHandlingDone();
+                }
+            });
+        } else {
+            Log.e(TAG, "Error. mChannelScanListener is null.");
         }
     }
 
@@ -296,7 +329,14 @@ public class ChannelDataManager implements Handler.Callback {
             }
             case MSG_HANDLE_CHANNEL: {
                 TunerChannel channel = (TunerChannel) msg.obj;
-                handleChannel(channel);
+                if (channel != null) {
+                    handleChannel(channel);
+                }
+                if (scanCompleted.get() && mIsScanning.get()
+                        && !mHandler.hasMessages(MSG_HANDLE_CHANNEL)) {
+                    // Complete the scan when all found channels have already been handled.
+                    scannedChannelHandlingCompleted();
+                }
                 return true;
             }
             case MSG_BUILD_CHANNEL_MAP: {
@@ -316,10 +356,6 @@ public class ChannelDataManager implements Handler.Callback {
             }
             case MSG_CLEAR_CHANNELS: {
                 clearChannels();
-                return true;
-            }
-            case MSG_SCAN_COMPLETED: {
-                mScanLatch.countDown();
                 return true;
             }
             case MSG_CHECK_VERSION: {
@@ -347,15 +383,69 @@ public class ChannelDataManager implements Handler.Callback {
         long currentTime = System.currentTimeMillis();
         List<EitItem> oldItems = getAllProgramsForChannel(channel, currentTime,
                 currentTime + PROGRAM_QUERY_DURATION);
+        ArrayList<ContentProviderOperation> ops = new ArrayList<>();
         // TODO: Find a right way to check if the programs are added outside.
+        boolean addedOutside = false;
         for (EitItem item : oldItems) {
             if (item.getEventId() == 0) {
-                // The event has been added outside TV tuner. Do not update programs.
-                return;
+                // The event has been added outside TV tuner.
+                addedOutside = true;
+                break;
             }
         }
+
+        // Inserting programs only when there is no overlapping with existing data assuming that:
+        // 1. external EPG is more accurate and rich and
+        // 2. the data we add here will be updated when we apply external EPG.
+        if (addedOutside) {
+            // oldItemCount cannot be 0 if addedOutside is true.
+            int oldItemCount = oldItems.size();
+            for (EitItem newItem : items) {
+                if (newItem.getEndTimeUtcMillis() < currentTime) {
+                    continue;
+                }
+                long newItemStartTime = newItem.getStartTimeUtcMillis();
+                long newItemEndTime = newItem.getEndTimeUtcMillis();
+                if (newItemStartTime < oldItems.get(0).getStartTimeUtcMillis()) {
+                    // Start time smaller than that of any old items. Insert if no overlap.
+                    if (newItemEndTime > oldItems.get(0).getStartTimeUtcMillis()) continue;
+                } else if (newItemStartTime
+                        > oldItems.get(oldItemCount - 1).getStartTimeUtcMillis()) {
+                    // Start time larger than that of any old item. Insert if no overlap.
+                    if (newItemStartTime
+                            < oldItems.get(oldItemCount - 1).getEndTimeUtcMillis()) continue;
+                } else {
+                    int pos = Collections.binarySearch(oldItems, newItem,
+                            new Comparator<EitItem>() {
+                                @Override
+                                public int compare(EitItem lhs, EitItem rhs) {
+                                    return Long.compare(lhs.getStartTimeUtcMillis(),
+                                            rhs.getStartTimeUtcMillis());
+                                }
+                            });
+                    if (pos >= 0) {
+                        // Same start Time found. Overlapped.
+                        continue;
+                    }
+                    int insertPoint = -1 - pos;
+                    // Check the two adjacent items.
+                    if (newItemStartTime < oldItems.get(insertPoint - 1).getEndTimeUtcMillis()
+                            || newItemEndTime > oldItems.get(insertPoint).getStartTimeUtcMillis()) {
+                        continue;
+                    }
+                }
+                ops.add(buildContentProviderOperation(ContentProviderOperation.newInsert(
+                        TvContract.Programs.CONTENT_URI), newItem, channel.getChannelId()));
+                if (ops.size() >= BATCH_OPERATION_COUNT) {
+                    applyBatch(channel.getName(), ops);
+                    ops.clear();
+                }
+            }
+            applyBatch(channel.getName(), ops);
+            return;
+        }
+
         List<EitItem> outdatedOldItems = new ArrayList<>();
-        ArrayList<ContentProviderOperation> ops = new ArrayList<>();
         Map<Integer, EitItem> newEitItemMap = new HashMap<>();
         for (EitItem item : items) {
             newEitItemMap.put(item.getEventId(), item);
@@ -379,22 +469,8 @@ public class ChannelDataManager implements Handler.Callback {
                 item.setDescription(oldItem.getDescription());
             }
             if (item.compareTo(oldItem) != 0) {
-                ops.add(ContentProviderOperation.newUpdate(
-                        TvContract.buildProgramUri(oldItem.getProgramId()))
-                        .withValue(TvContract.Programs.COLUMN_TITLE, item.getTitleText())
-                        .withValue(TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS,
-                                item.getStartTimeUtcMillis())
-                        .withValue(TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
-                                item.getEndTimeUtcMillis())
-                        .withValue(TvContract.Programs.COLUMN_CONTENT_RATING,
-                                item.getContentRating())
-                        .withValue(TvContract.Programs.COLUMN_AUDIO_LANGUAGE,
-                                item.getAudioLanguage())
-                        .withValue(TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
-                                item.getDescription())
-                        .withValue(TvContract.Programs.COLUMN_VERSION_NUMBER,
-                                item.getEventId())
-                        .build());
+                ops.add(buildContentProviderOperation(ContentProviderOperation.newUpdate(
+                        TvContract.buildProgramUri(oldItem.getProgramId())), item, null));
                 if (ops.size() >= BATCH_OPERATION_COUNT) {
                     applyBatch(channel.getName(), ops);
                     ops.clear();
@@ -428,9 +504,24 @@ public class ChannelDataManager implements Handler.Callback {
             if (item.getEndTimeUtcMillis() < currentTime) {
                 continue;
             }
-            ops.add(ContentProviderOperation.newInsert(TvContract.Programs.CONTENT_URI)
-                    .withValue(TvContract.Programs.COLUMN_CHANNEL_ID, channel.getChannelId())
-                    .withValue(TvContract.Programs.COLUMN_TITLE, item.getTitleText())
+            ops.add(buildContentProviderOperation(ContentProviderOperation.newInsert(
+                    TvContract.Programs.CONTENT_URI), item, channel.getChannelId()));
+            if (ops.size() >= BATCH_OPERATION_COUNT) {
+                applyBatch(channel.getName(), ops);
+                ops.clear();
+            }
+        }
+
+        applyBatch(channel.getName(), ops);
+    }
+
+    private ContentProviderOperation buildContentProviderOperation(
+            ContentProviderOperation.Builder builder, EitItem item, Long channelId) {
+        if (channelId != null) {
+            builder.withValue(TvContract.Programs.COLUMN_CHANNEL_ID, channelId);
+        }
+        if (item != null) {
+            builder.withValue(TvContract.Programs.COLUMN_TITLE, item.getTitleText())
                     .withValue(TvContract.Programs.COLUMN_START_TIME_UTC_MILLIS,
                             item.getStartTimeUtcMillis())
                     .withValue(TvContract.Programs.COLUMN_END_TIME_UTC_MILLIS,
@@ -442,15 +533,9 @@ public class ChannelDataManager implements Handler.Callback {
                     .withValue(TvContract.Programs.COLUMN_SHORT_DESCRIPTION,
                             item.getDescription())
                     .withValue(TvContract.Programs.COLUMN_VERSION_NUMBER,
-                            item.getEventId())
-                    .build());
-            if (ops.size() >= BATCH_OPERATION_COUNT) {
-                applyBatch(channel.getName(), ops);
-                ops.clear();
-            }
+                            item.getEventId());
         }
-
-        applyBatch(channel.getName(), ops);
+        return builder.build();
     }
 
     private void applyBatch(String channelName, ArrayList<ContentProviderOperation> operations) {

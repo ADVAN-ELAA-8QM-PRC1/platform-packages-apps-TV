@@ -33,7 +33,7 @@ import java.util.Set;
 /**
  * Manages {@link TunerTsStreamer} for playback and recording.
  * The class hides handling of {@link TunerHal} from other classes.
- * This class is used by {@link TsMediaDataSourceManager}. Don't use this class directly.
+ * This class is used by {@link TsDataSourceManager}. Don't use this class directly.
  */
 class TunerTsStreamerManager {
     // The lock will protect mStreamerFinder, mSourceToStreamerMap and some part of TsStreamCreator
@@ -42,7 +42,7 @@ class TunerTsStreamerManager {
     private final Object mCancelLock = new Object();
     private final StreamerFinder mStreamerFinder = new StreamerFinder();
     private final Map<Integer, TsStreamerCreator> mCreators = new HashMap<>();
-    private final Map<TsMediaDataSource, TunerTsStreamer> mSourceToStreamerMap = new HashMap<>();
+    private final Map<TsDataSource, TunerTsStreamer> mSourceToStreamerMap = new HashMap<>();
     private final TunerHalManager mTunerHalManager = new TunerHalManager();
     private static TunerTsStreamerManager sInstance;
 
@@ -59,7 +59,7 @@ class TunerTsStreamerManager {
 
     private TunerTsStreamerManager() { }
 
-    synchronized TsMediaDataSource createDataSource(
+    synchronized TsDataSource createDataSource(
             Context context, TunerChannel channel, EventDetector.EventListener listener,
             int sessionId, boolean reuse) {
         TsStreamerCreator creator;
@@ -67,7 +67,7 @@ class TunerTsStreamerManager {
             if (mStreamerFinder.containsLocked(channel)) {
                 mStreamerFinder.appendSessionLocked(channel, sessionId);
                 TunerTsStreamer streamer =  mStreamerFinder.getStreamerLocked(channel);
-                TsMediaDataSource source = streamer.createMediaDataSource();
+                TsDataSource source = streamer.createDataSource();
                 mSourceToStreamerMap.put(source, streamer);
                 return source;
             }
@@ -82,7 +82,7 @@ class TunerTsStreamerManager {
             }
             if (!creator.isCancelledLocked()) {
                 mStreamerFinder.putLocked(channel, sessionId, streamer);
-                TsMediaDataSource source = streamer.createMediaDataSource();
+                TsDataSource source = streamer.createDataSource();
                 mSourceToStreamerMap.put(source, streamer);
                 return source;
             }
@@ -95,7 +95,7 @@ class TunerTsStreamerManager {
         return null;
     }
 
-    synchronized void releaseDataSource(TsMediaDataSource source, int sessionId,
+    synchronized void releaseDataSource(TsDataSource source, int sessionId,
             boolean reuse) {
         TunerTsStreamer streamer;
         synchronized (mCancelLock) {
@@ -203,7 +203,7 @@ class TunerTsStreamerManager {
                 }
             }
             if (!canceled) {
-                TunerTsStreamer tsStreamer = new TunerTsStreamer(hal, mEventListener);
+                TunerTsStreamer tsStreamer = new TunerTsStreamer(hal, mEventListener, mContext);
                 if (tsStreamer.startStream(mChannel)) {
                     return tsStreamer;
                 }

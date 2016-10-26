@@ -46,11 +46,11 @@ public interface TsStreamer {
     void stopStream();
 
     /**
-     * Creates {@link TsMediaDataSource} which will provide MPEG-2 TS stream for
+     * Creates {@link TsDataSource} which will provide MPEG-2 TS stream for
      * {@link android.media.MediaExtractor}. The source will start from the position
      * where it is created.
      *
-     * @return {@link TsMediaDataSource}
+     * @return {@link TsDataSource}
      */
-    TsMediaDataSource createMediaDataSource();
+    TsDataSource createDataSource();
 }

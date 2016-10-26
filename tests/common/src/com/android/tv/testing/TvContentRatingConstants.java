@@ -58,7 +58,4 @@ public final class TvContentRatingConstants {
     public static final TvContentRating CONTENT_RATING_US_TV_PG_US_TV_L_US_TV_S =
             TvContentRating.createRating("com.android.tv", "US_TV", "US_TV_PG", "US_TV_L",
                     "US_TV_S");
-
-    public static String STRING_US_TV_PG_US_TV_L_US_TV_S
-            = "com.android.tv/US_TV/US_TV_Y7/US_TV_L/US_TV_S";
 }

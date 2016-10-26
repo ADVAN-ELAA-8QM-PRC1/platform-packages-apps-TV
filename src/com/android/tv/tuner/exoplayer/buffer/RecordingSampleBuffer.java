@@ -183,12 +183,16 @@ public class RecordingSampleBuffer implements BufferManager.SampleBuffer,
 
     @Override
     public void handleWriteSpeedSlow() throws IOException{
-        Log.w(TAG, "Disk is too slow for recording");
         if (mBufferReason == BUFFER_REASON_RECORDING) {
-            // Stops the recording immediately.
-            throw new IOException("Write bandwidth is not enough");
+            // Recording does not need to stop because I/O speed is slow temporarily.
+            // If fixed size buffer of TsStreamer overflows, TsDataSource will reach EoS.
+            // Reaching EoS will stop recording eventually.
+            Log.w(TAG, "Disk I/O speed is slow for recording temporarily: "
+                    + mBufferManager.getWriteBandwidth() + "MBps");
+            return;
         }
         // Disables buffering samples afterwards, and notifies the disk speed is slow.
+        Log.w(TAG, "Disk is too slow for trickplay");
         mBufferManager.disable();
         mBufferListener.onDiskTooSlow();
     }

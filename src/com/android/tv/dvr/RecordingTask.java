@@ -41,6 +41,7 @@ import com.android.tv.dvr.InputTaskScheduler.HandlerWrapper;
 import com.android.tv.util.Clock;
 import com.android.tv.util.Utils;
 
+import java.util.Comparator;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,6 +57,39 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
         DvrManager.Listener {
     private static final String TAG = "RecordingTask";
     private static final boolean DEBUG = false;
+
+    /**
+     * Compares the end time in ascending order.
+     */
+    public static final Comparator<RecordingTask> END_TIME_COMPARATOR
+            = new Comparator<RecordingTask>() {
+        @Override
+        public int compare(RecordingTask lhs, RecordingTask rhs) {
+            return Long.compare(lhs.getEndTimeMs(), rhs.getEndTimeMs());
+        }
+    };
+
+    /**
+     * Compares ID in ascending order.
+     */
+    public static final Comparator<RecordingTask> ID_COMPARATOR
+            = new Comparator<RecordingTask>() {
+        @Override
+        public int compare(RecordingTask lhs, RecordingTask rhs) {
+            return Long.compare(lhs.getScheduleId(), rhs.getScheduleId());
+        }
+    };
+
+    /**
+     * Compares the priority in ascending order.
+     */
+    public static final Comparator<RecordingTask> PRIORITY_COMPARATOR
+            = new Comparator<RecordingTask>() {
+        @Override
+        public int compare(RecordingTask lhs, RecordingTask rhs) {
+            return Long.compare(lhs.getPriority(), rhs.getPriority());
+        }
+    };
 
     @VisibleForTesting
     static final int MSG_INITIALIZE = 1;
@@ -169,6 +203,14 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
     }
 
     @Override
+    public void onConnectionFailed(String inputId) {
+        if (DEBUG) Log.d(TAG, "onConnectionFailed(" + inputId + ")");
+        if (mRecordingSession != null) {
+            failAndQuit();
+        }
+    }
+
+    @Override
     public void onTuned(Uri channelUri) {
         if (DEBUG) Log.d(TAG, "onTuned");
         if (mRecordingSession == null) {
@@ -252,7 +294,8 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
 
         String inputId = mChannel.getInputId();
         mRecordingSession = mSessionManager.createRecordingSession(inputId,
-                "recordingTask-" + mScheduledRecording.getId(), this, mHandler);
+                "recordingTask-" + mScheduledRecording.getId(), this,
+                mHandler, mScheduledRecording.getEndTimeMs());
         mState = State.SESSION_ACQUIRED;
         mDvrManager.addListener(this, mHandler);
         mRecordingSession.tune(inputId, mChannel.getUri());
@@ -302,11 +345,15 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
     private void handleUpdateSchedule(ScheduledRecording schedule) {
         mScheduledRecording = schedule;
         // Check end time only. The start time is checked in InputTaskScheduler.
-        if (schedule.getEndTimeMs() != mScheduledRecording.getEndTimeMs()
-                && mState == State.RECORDING_STARTED) {
-            mHandler.removeMessages(MSG_STOP_RECORDING);
-            if (!sendEmptyMessageAtAbsoluteTime(MSG_STOP_RECORDING, schedule.getEndTimeMs())) {
-                failAndQuit();
+        if (schedule.getEndTimeMs() != mScheduledRecording.getEndTimeMs()) {
+            if (mRecordingSession != null) {
+                mRecordingSession.setEndTimeMs(schedule.getEndTimeMs());
+            }
+            if (mState == State.RECORDING_STARTED) {
+                mHandler.removeMessages(MSG_STOP_RECORDING);
+                if (!sendEmptyMessageAtAbsoluteTime(MSG_STOP_RECORDING, schedule.getEndTimeMs())) {
+                    failAndQuit();
+                }
             }
         }
     }
@@ -314,6 +361,10 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
     @VisibleForTesting
     State getState() {
         return mState;
+    }
+
+    private long getScheduleId() {
+        return mScheduledRecording.getId();
     }
 
     /**
@@ -359,7 +410,7 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
         if (DEBUG) Log.d(TAG, "Updating the state of " + mScheduledRecording + " to " + state);
         mScheduledRecording = ScheduledRecording.buildFrom(mScheduledRecording).setState(state)
                 .build();
-        mMainThreadHandler.post(new Runnable() {
+        runOnMainThread(new Runnable() {
             @Override
             public void run() {
                 ScheduledRecording schedule = mDataManager.getScheduledRecording(
@@ -427,6 +478,19 @@ public class RecordingTask extends RecordingCallback implements Handler.Callback
         mCanceled = true;
         stop();
         removeRecordedProgram();
+    }
+
+    /**
+     * Clean up the task.
+     */
+    public void cleanUp() {
+        if (mState == State.RECORDING_STARTED || mState == State.RECORDING_STOP_REQUESTED) {
+            updateRecordingState(ScheduledRecording.STATE_RECORDING_FAILED);
+        }
+        release();
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
     }
 
     @Override

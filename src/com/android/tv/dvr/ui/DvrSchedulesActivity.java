@@ -17,16 +17,24 @@
 package com.android.tv.dvr.ui;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.os.Bundle;
 import android.support.annotation.IntDef;
-import android.support.v17.leanback.app.DetailsFragment;
 
 import com.android.tv.R;
+import com.android.tv.TvApplication;
+import com.android.tv.data.Program;
+import com.android.tv.dvr.EpisodicProgramLoadTask;
+import com.android.tv.dvr.SeriesRecording;
+import com.android.tv.dvr.SeriesRecordingScheduler;
 import com.android.tv.dvr.ui.list.DvrSchedulesFragment;
 import com.android.tv.dvr.ui.list.DvrSeriesSchedulesFragment;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Activity to show the list of recording schedules.
@@ -49,46 +57,48 @@ public class DvrSchedulesActivity extends Activity {
      * A type which means the activity will display a scheduled recording list of a series
      * recording.
      */
-    public final static int TYPE_SERIES_SCHEDULE = 1;
-
-    private Runnable mCancelAllClickedRunnable;
+    public static final int TYPE_SERIES_SCHEDULE = 1;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    public void onCreate(final Bundle savedInstanceState) {
+        TvApplication.setCurrentRunningProcess(this, true);
+        // Pass null to prevent automatically re-creating fragments
+        super.onCreate(null);
         setContentView(R.layout.activity_dvr_schedules);
-        if (savedInstanceState == null) {
-            int schedulesType = getIntent().getIntExtra(KEY_SCHEDULES_TYPE, TYPE_FULL_SCHEDULE);
-            DetailsFragment schedulesFragment = null;
-            if (schedulesType == TYPE_FULL_SCHEDULE) {
-                schedulesFragment = new DvrSchedulesFragment();
-                schedulesFragment.setArguments(getIntent().getExtras());
-            } else if (schedulesType == TYPE_SERIES_SCHEDULE) {
-                schedulesFragment = new DvrSeriesSchedulesFragment();
-                schedulesFragment.setArguments(getIntent().getExtras());
-            }
-            if (schedulesFragment != null) {
-                getFragmentManager().beginTransaction().add(
-                        R.id.fragment_container, schedulesFragment).commit();
-            } else {
-                finish();
-            }
-        }
-    }
-
-    /**
-     * Sets cancel all runnable which will implement operations after clicking cancel all dialog.
-     */
-    public void setCancelAllClickedRunnable(Runnable cancelAllClickedRunnable) {
-        mCancelAllClickedRunnable = cancelAllClickedRunnable;
-    }
-
-    /**
-     * Operations after clicking the cancel all.
-     */
-    public void onCancelAllClicked() {
-        if (mCancelAllClickedRunnable != null) {
-            mCancelAllClickedRunnable.run();
+        int scheduleType = getIntent().getIntExtra(KEY_SCHEDULES_TYPE, TYPE_FULL_SCHEDULE);
+        if (scheduleType == TYPE_FULL_SCHEDULE) {
+            DvrSchedulesFragment schedulesFragment = new DvrSchedulesFragment();
+            schedulesFragment.setArguments(getIntent().getExtras());
+            getFragmentManager().beginTransaction().add(
+                    R.id.fragment_container, schedulesFragment).commit();
+        } else if (scheduleType == TYPE_SERIES_SCHEDULE) {
+            final ProgressDialog dialog = ProgressDialog.show(this, null, getString(
+                    R.string.dvr_series_schedules_progress_message_reading_programs));
+            SeriesRecording seriesRecording = getIntent().getExtras()
+                    .getParcelable(DvrSeriesSchedulesFragment
+                            .SERIES_SCHEDULES_KEY_SERIES_RECORDING);
+            // To get programs faster, hold the update of the series schedules.
+            SeriesRecordingScheduler.getInstance(this).pauseUpdate();
+            new EpisodicProgramLoadTask(this, Collections.singletonList(seriesRecording)) {
+                @Override
+                protected void onPostExecute(List<Program> programs) {
+                    SeriesRecordingScheduler.getInstance(DvrSchedulesActivity.this).resumeUpdate();
+                    dialog.dismiss();
+                    Bundle args = getIntent().getExtras();
+                    args.putParcelableArrayList(DvrSeriesSchedulesFragment
+                            .SERIES_SCHEDULES_KEY_SERIES_PROGRAMS, new ArrayList<>(programs));
+                    DvrSeriesSchedulesFragment schedulesFragment = new DvrSeriesSchedulesFragment();
+                    schedulesFragment.setArguments(args);
+                    getFragmentManager().beginTransaction().add(
+                            R.id.fragment_container, schedulesFragment).commit();
+                }
+            }.setLoadCurrentProgram(true)
+                    .setLoadDisallowedProgram(true)
+                    .setLoadScheduledEpisode(true)
+                    .setIgnoreChannelOption(true)
+                    .execute();
+        } else {
+            finish();
         }
     }
 }

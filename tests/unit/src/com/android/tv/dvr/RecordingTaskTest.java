@@ -84,12 +84,12 @@ public class RecordingTaskTest extends AndroidTestCase {
         RecordingTask task = createRecordingTask(r, channel);
         String inputId = channel.getInputId();
         when(mMockSessionManager.createRecordingSession(eq(inputId), anyString(), eq(task),
-                eq(mMockHandler))).thenReturn(mMockRecordingSession);
+                eq(mMockHandler), anyLong())).thenReturn(mMockRecordingSession);
         when(mMockHandler.sendMessageAtTime(anyObject(), anyLong())).thenReturn(true);
         assertTrue(task.handleMessage(createMessage(RecordingTask.MSG_INITIALIZE)));
         assertEquals(State.CONNECTION_PENDING, task.getState());
         verify(mMockSessionManager).createRecordingSession(eq(inputId), anyString(), eq(task),
-                eq(mMockHandler));
+                eq(mMockHandler), anyLong());
         verify(mMockRecordingSession).tune(eq(inputId), eq(channel.getUri()));
         verifyNoMoreInteractions(mMockHandler, mMockRecordingSession, mMockSessionManager);
     }
@@ -106,7 +106,7 @@ public class RecordingTaskTest extends AndroidTestCase {
         RecordingTask task = createRecordingTask(r, channel);
         String inputId = channel.getInputId();
         when(mMockSessionManager.createRecordingSession(eq(inputId), anyString(), eq(task),
-                eq(mMockHandler))).thenReturn(mMockRecordingSession);
+                eq(mMockHandler), anyLong())).thenReturn(mMockRecordingSession);
         when(mMockHandler.sendMessageAtTime(anyObject(), anyLong())).thenReturn(true);
         task.handleMessage(createMessage(RecordingTask.MSG_INITIALIZE));
         task.onTuned(channel.getUri());

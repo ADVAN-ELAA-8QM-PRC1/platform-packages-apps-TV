@@ -76,13 +76,17 @@ public class DetailsViewBackgroundHelper {
      * Sets the background color.
      */
     public void setBackgroundColor(int color) {
-        mBackgroundManager.setColor(color);
+        if (mBackgroundManager.isAttached()) {
+            mBackgroundManager.setColor(color);
+        }
     }
 
     /**
      * Sets the background scrim.
      */
     public void setScrim(int color) {
-        mBackgroundManager.setDimLayer(new ColorDrawable(color));
+        if (mBackgroundManager.isAttached()) {
+            mBackgroundManager.setDimLayer(new ColorDrawable(color));
+        }
     }
 }

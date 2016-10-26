@@ -35,4 +35,16 @@
         style="@style/track_meta_text.channel_banner"
         android:visibility="gone" />
 
+    <TextView android:id="@+id/content_ratings_0"
+        style="@style/track_meta_text.channel_banner"
+        android:visibility="gone" />
+
+    <TextView android:id="@+id/content_ratings_1"
+        style="@style/track_meta_text.channel_banner"
+        android:visibility="gone" />
+
+    <TextView android:id="@+id/content_ratings_2"
+        style="@style/track_meta_text.channel_banner"
+        android:visibility="gone" />
+
 </LinearLayout>

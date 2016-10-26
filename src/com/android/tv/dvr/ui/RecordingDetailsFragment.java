@@ -33,13 +33,10 @@ import com.android.tv.dvr.ScheduledRecording;
  */
 abstract class RecordingDetailsFragment extends DvrDetailsFragment {
     private ScheduledRecording mRecording;
-    private DetailsContent mDetailsContent;
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        mDetailsContent = createDetailsContent();
-        setDetailsOverviewRow(mDetailsContent);
+    protected void onCreateInternal() {
+        setDetailsOverviewRow(createDetailsContent());
     }
 
     @Override
@@ -47,11 +44,7 @@ abstract class RecordingDetailsFragment extends DvrDetailsFragment {
         long scheduledRecordingId = args.getLong(DvrDetailsActivity.RECORDING_ID);
         mRecording = TvApplication.getSingletons(getContext()).getDvrDataManager()
                 .getScheduledRecording(scheduledRecordingId);
-        if (mRecording == null) {
-            // notify super class to end activity before initializing anything
-            return false;
-        }
-        return true;
+        return mRecording != null;
     }
 
     /**

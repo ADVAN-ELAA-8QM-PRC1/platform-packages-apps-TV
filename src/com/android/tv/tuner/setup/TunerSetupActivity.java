@@ -31,7 +31,9 @@ import android.graphics.BitmapFactory;
 import android.media.tv.TvContract;
 import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
+import android.util.Log;
 import android.view.KeyEvent;
+import android.widget.Toast;
 
 import com.android.tv.TvApplication;
 import com.android.tv.common.TvCommonConstants;
@@ -40,6 +42,7 @@ import com.android.tv.common.ui.setup.SetupActivity;
 import com.android.tv.common.ui.setup.SetupFragment;
 import com.android.tv.common.ui.setup.SetupMultiPaneFragment;
 import com.android.tv.tuner.R;
+import com.android.tv.tuner.TunerHal;
 import com.android.tv.tuner.TunerPreferences;
 import com.android.tv.tuner.tvinput.TunerTvInputService;
 import com.android.tv.tuner.util.TunerInputInfoUtils;
@@ -48,6 +51,7 @@ import com.android.tv.tuner.util.TunerInputInfoUtils;
  * An activity that serves tuner setup process.
  */
 public class TunerSetupActivity extends SetupActivity {
+    private final String TAG = "TunerSetupActivity";
     // For the recommendation card
     private static final String TV_ACTIVITY_CLASS_NAME = "com.android.tv.TvActivity";
     private static final String NOTIFY_TAG = "TunerSetup";
@@ -107,9 +111,23 @@ public class TunerSetupActivity extends SetupActivity {
                 }
                 return true;
             case ConnectionTypeFragment.ACTION_CATEGORY:
+                TunerHal hal = TunerHal.createInstance(getApplicationContext());
+                if (hal == null) {
+                    finish();
+                    Toast.makeText(getApplicationContext(),
+                            R.string.ut_channel_scan_tuner_unavailable,Toast.LENGTH_LONG).show();
+                    return true;
+                }
+                try {
+                    hal.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Tuner hal close failed", e);
+                    return true;
+                }
                 mLastScanFragment = new ScanFragment();
                 Bundle args = new Bundle();
-                args.putInt(ScanFragment.EXTRA_FOR_CHANNEL_SCAN_FILE, CHANNEL_MAP_SCAN_FILE[actionId]);
+                args.putInt(ScanFragment.EXTRA_FOR_CHANNEL_SCAN_FILE,
+                        CHANNEL_MAP_SCAN_FILE[actionId]);
                 mLastScanFragment.setArguments(args);
                 showFragment(mLastScanFragment, true);
                 return true;

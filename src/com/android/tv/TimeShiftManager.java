@@ -19,8 +19,6 @@ package com.android.tv;
 import android.annotation.SuppressLint;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.os.AsyncTask;
-import android.os.AsyncTask.Status;
 import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.IntDef;
@@ -63,8 +61,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class TimeShiftManager {
     private static final String TAG = "TimeShiftManager";
-    // STOPSHIP: Turn this flag off once b/31074952 is fixed.
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({PLAY_STATUS_PAUSED, PLAY_STATUS_PLAYING})
@@ -894,7 +891,6 @@ public class TimeShiftManager {
                     endTimeMs + PREFETCH_DURATION_FOR_NEXT);
             if (needToLoad) {
                 Range<Long> period = Range.create(fetchStartTimeMs, endTimeMs);
-                SoftPreconditions.checkState(isAvailable(), TAG, "Time shifting is not available");
                 mProgramLoadQueue.add(period);
                 startTaskIfNeeded();
             }
@@ -907,52 +903,24 @@ public class TimeShiftManager {
             if (mProgramLoadTask == null || mProgramLoadTask.isCancelled()) {
                 startNext();
             } else {
-                switch (mProgramLoadTask.getStatus()) {
-                    case PENDING:
-                        SoftPreconditions.checkState(false, TAG,
-                                "The state of task can not be PENDING");
-                        if (mProgramLoadTask.overlaps(mProgramLoadQueue)) {
-                            if (mProgramLoadTask.cancel(true)) {
-                                SoftPreconditions.checkState(isAvailable(), TAG,
-                                        "Time shifting is not available");
-                                mProgramLoadQueue.add(mProgramLoadTask.getPeriod());
-                                mProgramLoadTask = null;
-                                startNext();
-                            }
-                        }
-                        break;
-                    case RUNNING:
-                        // Remove pending task fully satisfied by the current
-                        Range<Long> current = mProgramLoadTask.getPeriod();
-                        Iterator<Range<Long>> i = mProgramLoadQueue.iterator();
-                        while (i.hasNext()) {
-                            Range<Long> r = i.next();
-                            if (current.contains(r)) {
-                                i.remove();
-                            }
-                        }
-                        break;
-                    case FINISHED:
-                        SoftPreconditions.checkState(false, TAG,
-                                "The state of task can not be FINISHED");
-                        // The task should have already cleared it self, clear and restart anyways.
-                        Log.w(TAG, mProgramLoadTask + " is finished, but was not cleared");
-                        startNext();
-                        break;
+                // Remove pending task fully satisfied by the current
+                Range<Long> current = mProgramLoadTask.getPeriod();
+                Iterator<Range<Long>> i = mProgramLoadQueue.iterator();
+                while (i.hasNext()) {
+                    Range<Long> r = i.next();
+                    if (current.contains(r)) {
+                        i.remove();
+                    }
                 }
             }
         }
 
         private void startNext() {
-            SoftPreconditions.checkState(mProgramLoadTask == null
-                    || mProgramLoadTask.getStatus() == Status.RUNNING, TAG,
-                    "The status of task should be \"RUNNING\"");
             mProgramLoadTask = null;
             if (mProgramLoadQueue.isEmpty()) {
                 return;
             }
 
-            SoftPreconditions.checkState(isAvailable(), TAG, "Time shifting should be available.");
             Range<Long> next = mProgramLoadQueue.poll();
             // Extend next to include any overlapping Ranges.
             Iterator<Range<Long>> i = mProgramLoadQueue.iterator();
@@ -1134,7 +1102,6 @@ public class TimeShiftManager {
 
         private void schedulePrefetchPrograms() {
             if (DEBUG) Log.d(TAG, "Scheduling prefetching programs.");
-            SoftPreconditions.checkState(isAvailable(), TAG, "Time shifting is not available");
             if (mHandler.hasMessages(MSG_PREFETCH_PROGRAM)) {
                 return;
             }
@@ -1172,7 +1139,6 @@ public class TimeShiftManager {
 
         // Prefetch programs within PREFETCH_DURATION_FOR_NEXT from now.
         private void prefetchPrograms() {
-            SoftPreconditions.checkState(isAvailable(), TAG, "Time shifting is not available");
             long startTimeMs;
             Program lastValidProgram = getLastValidProgram();
             if (lastValidProgram == null) {

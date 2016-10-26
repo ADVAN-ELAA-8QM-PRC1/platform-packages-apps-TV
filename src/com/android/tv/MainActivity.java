@@ -94,9 +94,11 @@ import com.android.tv.data.epg.EpgFetcher;
 import com.android.tv.dialog.PinDialogFragment;
 import com.android.tv.dialog.SafeDismissDialogFragment;
 import com.android.tv.dvr.ConflictChecker;
-import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrUiHelper;
+import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.dvr.ui.DvrStopRecordingFragment;
+import com.android.tv.dvr.ui.HalfSizedDialogFragment;
 import com.android.tv.experiments.Experiments;
 import com.android.tv.menu.Menu;
 import com.android.tv.onboarding.OnboardingActivity;
@@ -205,6 +207,7 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
         BLACKLIST_KEYCODE_TO_TIS.add(KeyEvent.KEYCODE_VOLUME_MUTE);
         BLACKLIST_KEYCODE_TO_TIS.add(KeyEvent.KEYCODE_MUTE);
         BLACKLIST_KEYCODE_TO_TIS.add(KeyEvent.KEYCODE_SEARCH);
+        BLACKLIST_KEYCODE_TO_TIS.add(KeyEvent.KEYCODE_WINDOW);
     }
 
 
@@ -231,10 +234,25 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
         UPDATE_CHANNEL_BANNER_REASON_TUNE_FAST, UPDATE_CHANNEL_BANNER_REASON_UPDATE_INFO,
         UPDATE_CHANNEL_BANNER_REASON_LOCK_OR_UNLOCK})
     private @interface ChannelBannerUpdateReason {}
+    /**
+     * Updates channel banner because the channel banner is forced to show.
+     */
     private static final int UPDATE_CHANNEL_BANNER_REASON_FORCE_SHOW = 1;
+    /**
+     * Updates channel banner because of tuning.
+     */
     private static final int UPDATE_CHANNEL_BANNER_REASON_TUNE = 2;
+    /**
+     * Updates channel banner because of fast tuning.
+     */
     private static final int UPDATE_CHANNEL_BANNER_REASON_TUNE_FAST = 3;
+    /**
+     * Updates channel banner because of info updating.
+     */
     private static final int UPDATE_CHANNEL_BANNER_REASON_UPDATE_INFO = 4;
+    /**
+     * Updates channel banner because the current watched channel is locked or unlocked.
+     */
     private static final int UPDATE_CHANNEL_BANNER_REASON_LOCK_OR_UNLOCK = 5;
 
     private static final int TVVIEW_SET_MAIN_TIMEOUT_MS = 3000;
@@ -256,7 +274,6 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
     private final DurationTimer mMainDurationTimer = new DurationTimer();
     private final DurationTimer mTuneDurationTimer = new DurationTimer();
     private DvrManager mDvrManager;
-    private DvrDataManager mDvrDataManager;
     private ConflictChecker mDvrConflictChecker;
 
     private View mContentView;
@@ -463,8 +480,10 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
 
         // Check this permission for the EPG fetch.
         // TODO: check {@link shouldShowRequestPermissionRationale}.
-        if (Utils.hasInternalTvInputs(this, true) && checkSelfPermission(
-                android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        // While testing, no way to allow the permission when the dialog shows up. So we'd better
+        // not show the dialog.
+        if (!TvCommonUtils.isRunningInTest() && Utils.hasInternalTvInputs(this, true)
+                && checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] {android.Manifest.permission.ACCESS_COARSE_LOCATION},
                     PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION);
@@ -541,7 +560,6 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
         mMemoryManageables.add(TvContentRatingCache.getInstance());
         if (CommonFeatures.DVR.isEnabled(this)) {
             mDvrManager = tvApplication.getDvrManager();
-            mDvrDataManager = tvApplication.getDvrDataManager();
         }
         mTimeShiftManager = new TimeShiftManager(this, mTvView, mProgramDataManager, mTracker,
                 new OnCurrentProgramUpdatedListener() {
@@ -1179,7 +1197,8 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
      * It might be a live program. If the time shifting is available, it can be a past program, too.
      */
     public Program getCurrentProgram() {
-        if (mTimeShiftManager.isAvailable()) {
+        if (!isChannelChangeKeyDownReceived() && mTimeShiftManager.isAvailable()) {
+            // We shouldn't get current program from TimeShiftManager during channel tunning
             return mTimeShiftManager.getCurrentProgram();
         }
         return mProgramDataManager.getCurrentProgram(getCurrentChannelId());
@@ -2276,6 +2295,7 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
     @Override
     protected void onDestroy() {
         if (DEBUG) Log.d(TAG, "onDestroy()");
+        SideFragment.releasePreloadedRecycledViews();
         if (mTvView != null) {
             mTvView.release();
         }
@@ -2354,9 +2374,11 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                 case KeyEvent.KEYCODE_DPAD_UP:
                     if (event.getRepeatCount() == 0
                             && mChannelTuner.getBrowsableChannelCount() > 0) {
-                        moveToAdjacentChannel(true, false);
+                        // message sending should be done before moving channel, because we use the
+                        // existence of message to decide if users are switching channel.
                         mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_CHANNEL_UP_PRESSED,
                                 System.currentTimeMillis()), CHANNEL_CHANGE_INITIAL_DELAY_MILLIS);
+                        moveToAdjacentChannel(true, false);
                         mTracker.sendChannelUp();
                     }
                     return true;
@@ -2364,9 +2386,11 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                 case KeyEvent.KEYCODE_DPAD_DOWN:
                     if (event.getRepeatCount() == 0
                             && mChannelTuner.getBrowsableChannelCount() > 0) {
-                        moveToAdjacentChannel(false, false);
+                        // message sending should be done before moving channel, because we use the
+                        // existence of message to decide if users are switching channel.
                         mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_CHANNEL_DOWN_PRESSED,
                                 System.currentTimeMillis()), CHANNEL_CHANGE_INITIAL_DELAY_MILLIS);
+                        moveToAdjacentChannel(false, false);
                         mTracker.sendChannelDown();
                     }
                     return true;
@@ -2390,7 +2414,6 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
          *  S KEYCODE_CAPTIONS: select subtitle
          *  W debug: toggle screen size
          *  V KEYCODE_MEDIA_RECORD debug: record the current channel for 30 sec
-         *  X KEYCODE_BUTTON_X KEYCODE_PROG_BLUE debug: record current channel for a few minutes
          */
         if (SystemProperties.LOG_KEYEVENT.getValue()) {
             Log.d(TAG, "onKeyUp(" + keyCode + ", " + event + ")");
@@ -2492,7 +2515,9 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                                 false);
                     }
                     return true;
-
+                case KeyEvent.KEYCODE_WINDOW:
+                    enterPictureInPictureMode();
+                    return true;
                 case KeyEvent.KEYCODE_ENTER:
                 case KeyEvent.KEYCODE_NUMPAD_ENTER:
                 case KeyEvent.KEYCODE_E:
@@ -2542,7 +2567,60 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                     mOverlayManager.showBanner();
                     return true;
                 }
+                case KeyEvent.KEYCODE_MEDIA_RECORD:
+                case KeyEvent.KEYCODE_V: {
+                    Channel currentChannel = getCurrentChannel();
+                    if (currentChannel != null && mDvrManager != null) {
+                        boolean isRecording =
+                                mDvrManager.getCurrentRecording(currentChannel.getId()) != null;
+                        if (!isRecording) {
+                            if (!mDvrManager.isChannelRecordable(currentChannel)) {
+                                Toast.makeText(this, R.string.dvr_msg_cannot_record_program,
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                if (!DvrUiHelper.checkStorageStatusAndShowErrorMessage(this,
+                                        currentChannel.getInputId())) {
+                                    return true;
+                                }
+                                Program program = mProgramDataManager
+                                        .getCurrentProgram(currentChannel.getId());
+                                if (program == null) {
+                                    DvrUiHelper
+                                            .showChannelRecordDurationOptions(this, currentChannel);
+                                } else if (DvrUiHelper.handleCreateSchedule(this, program)) {
+                                    String msg = getString(
+                                            R.string.dvr_msg_current_program_scheduled,
+                                            program.getTitle(), Utils.toTimeString(
+                                                    program.getEndTimeUtcMillis(), false));
+                                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        } else {
+                            DvrUiHelper.showStopRecordingDialog(this, currentChannel.getId(),
+                                    DvrStopRecordingFragment.REASON_USER_STOP,
+                                    new HalfSizedDialogFragment.OnActionClickListener() {
+                                        @Override
+                                        public void onActionClick(long actionId) {
+                                            if (actionId == DvrStopRecordingFragment.ACTION_STOP) {
+                                                ScheduledRecording currentRecording =
+                                                        mDvrManager.getCurrentRecording(
+                                                                currentChannel.getId());
+                                                if (currentRecording != null) {
+                                                    mDvrManager.stopRecording(currentRecording);
+                                                }
+                                            }
+                                        }
+                                    });
+                        }
+                    }
+                    return true;
+                }
             }
+        }
+        if (keyCode == KeyEvent.KEYCODE_WINDOW) {
+            // Consumes the PIP button to prevent entering PIP mode
+            // in case that TV isn't showing properly (e.g. no browsable channel)
+            return true;
         }
         if (SystemProperties.USE_DEBUG_KEYS.getValue() || BuildConfig.ENG) {
             switch (keyCode) {
@@ -2578,36 +2656,9 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                     mOverlayManager.getSideFragmentManager().show(new DisplayModeFragment());
                     return true;
                 }
-
                 case KeyEvent.KEYCODE_D:
                     mOverlayManager.getSideFragmentManager().show(new DeveloperOptionFragment());
                     return true;
-
-                case KeyEvent.KEYCODE_MEDIA_RECORD: // TODO(DVR) handle with debug_keys set
-                case KeyEvent.KEYCODE_V: {
-                    DvrManager dvrManager = TvApplication.getSingletons(this).getDvrManager();
-                    long startTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(5);
-                    long endTime = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(35);
-                    dvrManager.addSchedule(getCurrentChannel(), startTime, endTime);
-                    return true;
-                }
-                case KeyEvent.KEYCODE_PROG_BLUE:
-                case KeyEvent.KEYCODE_BUTTON_X:
-                case KeyEvent.KEYCODE_X:
-                    if (CommonFeatures.DVR.isEnabled(this)) {
-                        Channel channel = mTvView.getCurrentChannel();
-                        long channelId = channel.getId();
-                        Program p = mProgramDataManager.getCurrentProgram(channelId);
-                        if (p == null) {
-                            long now = System.currentTimeMillis();
-                            mDvrManager
-                                    .addSchedule(channel, now, now + TimeUnit.MINUTES.toMillis(1));
-                        } else {
-                            mDvrManager.addSchedule(p, mDvrManager.getConflictingSchedules(p));
-                        }
-                        return true;
-                    }
-                    break;
             }
         }
         return super.onKeyUp(keyCode, event);
@@ -3109,8 +3160,10 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
-                initAnimations();
-                initSideFragments();
+                if (mActivityStarted) {
+                    initAnimations();
+                    initSideFragments();
+                }
             }
         }, LAZY_INITIALIZATION_DELAY);
     }
@@ -3142,13 +3195,17 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
             switch (msg.what) {
                 case MSG_CHANNEL_DOWN_PRESSED:
                     long startTime = (Long) msg.obj;
-                    mainActivity.moveToAdjacentChannel(false, true);
+                    // message re-sending should be done before moving channel, because we use the
+                    // existence of message to decide if users are switching channel.
                     sendMessageDelayed(Message.obtain(msg), getDelay(startTime));
+                    mainActivity.moveToAdjacentChannel(false, true);
                     break;
                 case MSG_CHANNEL_UP_PRESSED:
                     startTime = (Long) msg.obj;
-                    mainActivity.moveToAdjacentChannel(true, true);
+                    // message re-sending should be done before moving channel, because we use the
+                    // existence of message to decide if users are switching channel.
                     sendMessageDelayed(Message.obtain(msg), getDelay(startTime));
+                    mainActivity.moveToAdjacentChannel(true, true);
                     break;
                 case MSG_UPDATE_CHANNEL_BANNER_BY_INFO_UPDATE:
                     mainActivity.updateChannelBannerAndShowIfNeeded(
@@ -3262,7 +3319,7 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
                 mUnlockAllowedRatingBeforeShrunken = isUnderShrunkenTvView();
                 mTvView.unblockContent(rating);
             }
-
+            mChannelBannerView.setBlockingContentRating(rating);
             updateChannelBannerAndShowIfNeeded(UPDATE_CHANNEL_BANNER_REASON_LOCK_OR_UNLOCK);
             mTvViewUiManager.fadeInTvView();
         }
@@ -3272,6 +3329,7 @@ public class MainActivity extends Activity implements AudioManager.OnAudioFocusC
             if (!isUnderShrunkenTvView()) {
                 mUnlockAllowedRatingBeforeShrunken = false;
             }
+            mChannelBannerView.setBlockingContentRating(null);
             updateChannelBannerAndShowIfNeeded(UPDATE_CHANNEL_BANNER_REASON_LOCK_OR_UNLOCK);
         }
     }

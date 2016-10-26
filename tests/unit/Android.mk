@@ -9,7 +9,7 @@ LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
     android-support-test \
-    mockito-target-minus-junit4 \
+    mockito-target \
     tv-test-common \
 
 LOCAL_PACKAGE_NAME := TVUnitTests

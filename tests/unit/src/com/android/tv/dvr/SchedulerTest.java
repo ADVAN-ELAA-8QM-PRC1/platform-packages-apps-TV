@@ -49,7 +49,6 @@ import java.util.concurrent.TimeUnit;
 public class SchedulerTest extends AndroidTestCase {
     private static final String INPUT_ID = "input_id";
     private static final int CHANNEL_ID = 273;
-    private static final long LISTENER_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(1);
 
     private FakeClock mFakeClock;
     private DvrDataManagerInMemoryImpl mDataManager;

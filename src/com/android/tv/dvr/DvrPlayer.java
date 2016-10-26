@@ -55,6 +55,8 @@ public class DvrPlayer {
     private boolean mPauseOnPrepared;
     private final PlaybackParams mPlaybackParams = new PlaybackParams();
     private final DvrPlayerCallback mEmptyCallback = new DvrPlayerCallback();
+    private long mStartPositionMs = TvInputManager.TIME_SHIFT_INVALID_TIME;
+    private boolean mTimeShiftPlayAvailable;
 
     public static class DvrPlayerCallback {
         /**
@@ -67,6 +69,10 @@ public class DvrPlayer {
          * Called when the playback state or the playback speed is changed.
          */
         public void onPlaybackStateChanged(int playbackState, int playbackSpeed) { }
+        /**
+         * Called when the playback toward the end.
+         */
+        public void onPlaybackEnded() { }
     }
 
     public interface AspectRatioChangedListener {
@@ -208,7 +214,7 @@ public class DvrPlayer {
         }
         positionMs = getRealSeekPosition(positionMs, SEEK_POSITION_MARGIN_MS);
         if (DEBUG) Log.d(TAG, "Now: " + getPlaybackPosition() + ", shift to: " + positionMs);
-        mTvView.timeShiftSeekTo(positionMs);
+        mTvView.timeShiftSeekTo(positionMs + mStartPositionMs);
         if (mPlaybackState == PlaybackState.STATE_FAST_FORWARDING ||
                 mPlaybackState == PlaybackState.STATE_REWINDING) {
             mPlaybackState = PlaybackState.STATE_PLAYING;
@@ -222,12 +228,14 @@ public class DvrPlayer {
      */
     public void reset() {
         if (DEBUG) Log.d(TAG, "reset()");
-        mTvView.reset();
+        mCallback.onPlaybackStateChanged(PlaybackState.STATE_NONE, 1);
         mPlaybackState = PlaybackState.STATE_NONE;
+        mTvView.reset();
+        mTimeShiftPlayAvailable = false;
+        mStartPositionMs = TvInputManager.TIME_SHIFT_INVALID_TIME;
         mTimeShiftCurrentPositionMs = 0;
         mPlaybackParams.setSpeed(1.0f);
         mProgram = null;
-        mCallback.onPlaybackStateChanged(mPlaybackState, 1);
     }
 
     /**
@@ -317,43 +325,50 @@ public class DvrPlayer {
     private void setTvViewCallbacks() {
         mTvView.setTimeShiftPositionCallback(new TvView.TimeShiftPositionCallback() {
             @Override
+            public void onTimeShiftStartPositionChanged(String inputId, long timeMs) {
+                if (DEBUG) Log.d(TAG, "onTimeShiftStartPositionChanged:" + timeMs);
+                mStartPositionMs = timeMs;
+                if (mTimeShiftPlayAvailable) {
+                    resumeToWatchedPositionIfNeeded();
+                }
+            }
+
+            @Override
             public void onTimeShiftCurrentPositionChanged(String inputId, long timeMs) {
-                // Workaround solution for b/29994826:
-                // prevents rewinding and fast-forwarding over the ends.
+                if (DEBUG) Log.d(TAG, "onTimeShiftCurrentPositionChanged: " + timeMs);
+                if (!mTimeShiftPlayAvailable) {
+                    // Workaround of b/31436263
+                    return;
+                }
+                // Workaround of b/32211561, TIF won't report start position when TIS report
+                // its start position as 0. In that case, we have to do the prework of playback
+                // on the first time we get current position, and the start position should be 0
+                // at that time.
+                if (mStartPositionMs == TvInputManager.TIME_SHIFT_INVALID_TIME) {
+                    mStartPositionMs = 0;
+                    resumeToWatchedPositionIfNeeded();
+                }
+                timeMs -= mStartPositionMs;
                 if (mPlaybackState == PlaybackState.STATE_REWINDING
                         && timeMs <= REWIND_POSITION_MARGIN_MS) {
                     play();
-                } else if (mPlaybackState == PlaybackState.STATE_FAST_FORWARDING
-                        && timeMs >= mProgram.getDurationMillis() - SEEK_POSITION_MARGIN_MS) {
-                    mTvView.timeShiftSeekTo(mProgram.getDurationMillis() - SEEK_POSITION_MARGIN_MS);
-                    pause();
-                }
-                else {
+                } else {
                     mTimeShiftCurrentPositionMs = getRealSeekPosition(timeMs, 0);
                     mCallback.onPlaybackPositionChanged(mTimeShiftCurrentPositionMs);
+                    if (timeMs >= mProgram.getDurationMillis()) {
+                        pause();
+                        mCallback.onPlaybackEnded();
+                    }
                 }
             }
         });
         mTvView.setCallback(new TvView.TvInputCallback() {
             @Override
             public void onTimeShiftStatusChanged(String inputId, int status) {
-                if (DEBUG) Log.d(TAG, "onTimeShiftStatusChanged");
+                if (DEBUG) Log.d(TAG, "onTimeShiftStatusChanged:" + status);
                 if (status == TvInputManager.TIME_SHIFT_STATUS_AVAILABLE
                         && mPlaybackState == PlaybackState.STATE_CONNECTING) {
-                    if (mInitialSeekPositionMs != TvInputManager.TIME_SHIFT_INVALID_TIME) {
-                        mTvView.timeShiftSeekTo(getRealSeekPosition(
-                                mInitialSeekPositionMs, SEEK_POSITION_MARGIN_MS));
-                        mInitialSeekPositionMs = TvInputManager.TIME_SHIFT_INVALID_TIME;
-                    }
-                    if (mPauseOnPrepared) {
-                        mTvView.timeShiftPause();
-                        mPlaybackState = PlaybackState.STATE_PAUSED;
-                        mPauseOnPrepared = false;
-                    } else {
-                        mTvView.timeShiftResume();
-                        mPlaybackState = PlaybackState.STATE_PLAYING;
-                    }
-                    mCallback.onPlaybackStateChanged(mPlaybackState, 1);
+                    mTimeShiftPlayAvailable = true;
                 }
             }
 
@@ -389,5 +404,22 @@ public class DvrPlayer {
                 }
             }
         });
+    }
+
+    private void resumeToWatchedPositionIfNeeded() {
+        if (mInitialSeekPositionMs != TvInputManager.TIME_SHIFT_INVALID_TIME) {
+            mTvView.timeShiftSeekTo(getRealSeekPosition(mInitialSeekPositionMs,
+                    SEEK_POSITION_MARGIN_MS) + mStartPositionMs);
+            mInitialSeekPositionMs = TvInputManager.TIME_SHIFT_INVALID_TIME;
+        }
+        if (mPauseOnPrepared) {
+            mTvView.timeShiftPause();
+            mPlaybackState = PlaybackState.STATE_PAUSED;
+            mPauseOnPrepared = false;
+        } else {
+            mTvView.timeShiftResume();
+            mPlaybackState = PlaybackState.STATE_PLAYING;
+        }
+        mCallback.onPlaybackStateChanged(mPlaybackState, 1);
     }
 }

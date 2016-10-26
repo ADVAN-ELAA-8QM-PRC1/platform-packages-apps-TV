@@ -81,6 +81,7 @@ public class BufferManager {
     private int mMinSampleSizeForSpeedCheck = MINIMUM_SAMPLE_SIZE_FOR_SPEED_CHECK;
     private long mTotalWriteSize;
     private long mTotalWriteTimeNs;
+    private float mWriteBandwidth = 0.0f;
     private volatile int mSpeedCheckCount;
     private boolean mDisabled = false;
 
@@ -555,7 +556,8 @@ public class BufferManager {
         }
     }
 
-    private void resetWriteStat() {
+    private void resetWriteStat(float writeBandwidth) {
+        mWriteBandwidth = writeBandwidth;
         mTotalWriteSize = 0;
         mTotalWriteTimeNs = 0;
     }
@@ -585,8 +587,8 @@ public class BufferManager {
             return false;
         }
         mSpeedCheckCount++;
-        float megabytePerSecond = getWriteBandwidth();
-        resetWriteStat();
+        float megabytePerSecond = calculateWriteBandwidth();
+        resetWriteStat(megabytePerSecond);
         if (DEBUG) {
             Log.d(TAG, "Measured disk write performance: " + megabytePerSecond + "MBps");
         }
@@ -594,9 +596,14 @@ public class BufferManager {
     }
 
     /**
-     * Returns the disk write speed in megabytes per second.
+     * Returns recent write bandwidth in MBps. If recent bandwidth is not available,
+     * returns {float -1.0f}.
      */
-    private float getWriteBandwidth() {
+    public float getWriteBandwidth() {
+        return mWriteBandwidth == 0.0f ? -1.0f : mWriteBandwidth;
+    }
+
+    private float calculateWriteBandwidth() {
         if (mTotalWriteTimeNs == 0) {
             return -1;
         }

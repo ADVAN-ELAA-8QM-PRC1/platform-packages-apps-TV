@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"<xliff:g id="CHANNEL_NAME">%s</xliff:g> এ টিউন করতে ব্যর্থ হয়েছে"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"টিউন করতে ব্যর্থ হয়েছে"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"টিউনার সফ্টওয়্যার সম্প্রতি আপডেট করা হয়েছে৷ অনুগ্রহ করে চ্যানেলগুলি পুনরায় স্ক্যান করুন৷"</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"AC3 অডিও অনুপলব্ধ"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"অডিও সক্ষম করতে সিস্টেম সাউন্ড সেটিংসে সারাউন্ড সাউন্ড সক্ষম করুন"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"চ্যানেল টিউনার সেট আপ"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"TV টিউনার সেট আপ"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"USB চ্যানেল টিউনার সেটআপ"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"TV টিউনার সেট আপ"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"USB চ্যানেল টিউনার সেটআপ"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"এটি কয়েক মিনিট সময় নিতে পারে"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"টিউনার অস্থায়ীভাবে অনুপলব্ধ বা রেকডিংয়ে ইতিমধ্যেই ব্যবহৃত হয়েছে৷"</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="one">%1$dটি চ্যানেল পাওয়া গেছে</item>
       <item quantity="other">%1$dটি চ্যানেল পাওয়া গেছে</item>

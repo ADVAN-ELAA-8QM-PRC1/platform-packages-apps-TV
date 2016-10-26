@@ -55,6 +55,7 @@ import com.android.tv.dvr.DvrDataManagerImpl;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrRecordingService;
 import com.android.tv.dvr.DvrScheduleManager;
+import com.android.tv.dvr.DvrStorageStatusManager;
 import com.android.tv.dvr.DvrWatchedPositionManager;
 import com.android.tv.tuner.TunerPreferences;
 import com.android.tv.tuner.tvinput.TunerTvInputService;
@@ -95,6 +96,7 @@ public class TvApplication extends Application implements ApplicationSingletons 
     private DvrManager mDvrManager;
     private DvrScheduleManager mDvrScheduleManager;
     private DvrDataManager mDvrDataManager;
+    private DvrStorageStatusManager mDvrStorageStatusManager;
     private DvrWatchedPositionManager mDvrWatchedPositionManager;
     @Nullable
     private InputSessionManager mInputSessionManager;
@@ -129,14 +131,16 @@ public class TvApplication extends Application implements ApplicationSingletons 
         // Only set StrictMode for ENG builds because the build server only produces userdebug
         // builds.
         if (BuildConfig.ENG && SystemProperties.ALLOW_STRICT_MODE.getValue()) {
-            StrictMode.setThreadPolicy(
-                    new StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build());
-            StrictMode.VmPolicy.Builder vmPolicyBuilder = new StrictMode.VmPolicy.Builder()
-                    .detectAll().penaltyLog();
-            if (BuildConfig.ENG && SystemProperties.ALLOW_DEATH_PENALTY.getValue() &&
-                    !TvCommonUtils.isRunningInTest()) {
-                // TODO turn on death penalty for tests when they stop leaking MainActivity
+            StrictMode.ThreadPolicy.Builder threadPolicyBuilder =
+                    new StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog();
+            StrictMode.VmPolicy.Builder vmPolicyBuilder =
+                    new StrictMode.VmPolicy.Builder().detectAll().penaltyLog();
+            if (!TvCommonUtils.isRunningInTest()) {
+                threadPolicyBuilder.penaltyDialog();
+                // Turn off death penalty for tests b/23355898
+                vmPolicyBuilder.penaltyDeath();
             }
+            StrictMode.setThreadPolicy(threadPolicyBuilder.build());
             StrictMode.setVmPolicy(vmPolicyBuilder.build());
         }
         if (BuildConfig.ENG && !SystemProperties.ALLOW_ANALYTICS_IN_ENG.getValue()) {
@@ -160,6 +164,9 @@ public class TvApplication extends Application implements ApplicationSingletons 
             return;
         }
         mRunningInMainProcess = isMainProcess;
+        if (CommonFeatures.DVR.isEnabled(this)) {
+            mDvrStorageStatusManager = new DvrStorageStatusManager(this, mRunningInMainProcess);
+        }
         if (mRunningInMainProcess) {
             mTvInputManagerHelper.addCallback(new TvInputCallback() {
                 @Override
@@ -286,11 +293,20 @@ public class TvApplication extends Application implements ApplicationSingletons 
     @Override
     public DvrDataManager getDvrDataManager() {
         if (mDvrDataManager == null) {
-                DvrDataManagerImpl dvrDataManager = new DvrDataManagerImpl(this, Clock.SYSTEM);
-                mDvrDataManager = dvrDataManager;
-                dvrDataManager.start();
+            DvrDataManagerImpl dvrDataManager = new DvrDataManagerImpl(this, Clock.SYSTEM);
+            mDvrDataManager = dvrDataManager;
+            dvrDataManager.start();
         }
         return mDvrDataManager;
+    }
+
+    /**
+     * Returns {@link DvrStorageStatusManager}.
+     */
+    @TargetApi(Build.VERSION_CODES.N)
+    @Override
+    public DvrStorageStatusManager getDvrStorageStatusManager() {
+        return mDvrStorageStatusManager;
     }
 
     /**

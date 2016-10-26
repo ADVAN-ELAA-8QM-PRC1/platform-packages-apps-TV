@@ -54,8 +54,6 @@ public class TunerChannel implements Comparable<TunerChannel>, PsipData.TvTracks
             "Extended Parameterized Service" };
     private static final String ATSC_SERVICE_TYPE_NAME_RESERVED =
             ATSC_SERVICE_TYPE_NAMES[Channel.SERVICE_TYPE_ATSC_RESERVED];
-    private static final String ATSC_SERVICE_TYPE_NAME_DIGITAL_TELEVISION =
-            ATSC_SERVICE_TYPE_NAMES[Channel.SERVICE_TYPE_ATSC_DIGITAL_TELEVISION];
 
     public static final int INVALID_FREQUENCY = -1;
 

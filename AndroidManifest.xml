@@ -40,6 +40,7 @@
     <uses-feature android:name="android.software.live_tv" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
 
+
     <!-- Receives input events from the TV app. -->
     <permission android:name="com.android.tv.permission.RECEIVE_INPUT_EVENT"
         android:protectionLevel="signatureOrSystem"
@@ -90,9 +91,11 @@
         </activity>
 
         <activity android:name=".LauncherActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity android:name=".SetupPassthroughActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
             <intent-filter>
                 <action android:name="com.android.tv.action.LAUNCH_INPUT_SETUP" />
@@ -101,14 +104,17 @@
         </activity>
 
         <activity android:name=".SelectInputActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:launchMode="singleTask"
             android:theme="@style/Theme.SelectInputActivity" />
 
         <activity android:name=".onboarding.OnboardingActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:launchMode="singleTop"
             android:theme="@style/Theme.Setup.GuidedStep" />
 
         <activity android:name=".dvr.ui.DvrActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:launchMode="singleTask"
             android:theme="@style/Theme.Leanback.Browse" />
 
@@ -118,15 +124,22 @@
             android:theme="@style/Theme.Leanback" />
 
         <activity android:name=".dvr.ui.DvrDetailsActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:theme="@style/Theme.TV.Dvr.Browse.Details" />
 
         <activity android:name=".dvr.ui.DvrSeriesSettingsActivity"
-            android:theme="@style/Theme.TV.Dvr.Settings.GuidedStep" />
+            android:configChanges="keyboard|keyboardHidden"
+            android:theme="@style/Theme.TV.Dvr.Series.Settings.GuidedStep" />
 
         <activity android:name=".dvr.ui.DvrSeriesDeletionActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:theme="@style/Theme.TV.Dvr.Series.Deletion.GuidedStep" />
 
+        <activity android:name=".dvr.ui.DvrSeriesScheduledDialogActivity"
+            android:theme="@style/Theme.TV.dialog.HalfSizedDialog"/>
+
         <activity android:name=".dvr.ui.DvrSchedulesActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:theme="@style/Theme.Leanback.Details" />
 
         <provider android:name="com.android.tv.search.LocalSearchProvider"
@@ -172,6 +185,7 @@
 
         <!-- USB tuner components definition -->
         <activity android:name="com.android.tv.tuner.setup.TunerSetupActivity"
+            android:configChanges="keyboard|keyboardHidden"
             android:label="@string/bt_app_name"
             android:launchMode="singleInstance"
             android:process="com.android.tv.tuner"
@@ -196,6 +210,17 @@
             android:authorities="com.android.tv.tuner.preferences"
             android:process="com.android.tv.tuner"
             android:exported="false" />
+        <!-- System initial setup component definition -->
+        <activity android:name=".setup.SystemSetupActivity"
+                  android:configChanges="keyboard|keyboardHidden"
+                  android:label="@string/bt_app_name"
+                  android:launchMode="singleInstance"
+                  android:theme="@style/Theme.Setup.GuidedStep" >
+            <intent-filter>
+                <action android:name="com.android.tv.action.LAUNCH_SYSTEM_SETUP" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <!-- TunerInputController should be the same process with MainActivity to check status of MainActivity -->
         <receiver android:name=".tuner.TunerInputController"
             android:exported="false">
@@ -210,6 +235,11 @@
         <!-- DVR -->
         <service android:name=".dvr.DvrRecordingService" android:label="@string/dvr_service_name"/>
         <receiver android:name=".dvr.DvrStartRecordingReceiver"/>
+
+        <service android:name=".tuner.tvinput.TunerStorageCleanUpService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:process="com.android.tv.tuner"
+            android:exported="true" />
 
     </application>
 </manifest>

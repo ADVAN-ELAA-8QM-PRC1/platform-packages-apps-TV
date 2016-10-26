@@ -22,12 +22,13 @@ import android.support.v17.leanback.widget.ClassPresenterSelector;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.widget.TextView;
 
+import com.android.tv.ApplicationSingletons;
 import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.dvr.DvrDataManager;
+import com.android.tv.dvr.DvrScheduleManager;
 import com.android.tv.dvr.ScheduledRecording;
 
 /**
@@ -35,32 +36,39 @@ import com.android.tv.dvr.ScheduledRecording;
  */
 public abstract class BaseDvrSchedulesFragment extends DetailsFragment
         implements DvrDataManager.ScheduledRecordingListener,
-        SchedulesHeaderRowPresenter.SchedulesHeaderRowListener,
-        ScheduleRowPresenter.ScheduleRowClickListener {
+        DvrScheduleManager.OnConflictStateChangeListener {
     /**
      * The key for scheduled recording which has be selected in the list.
      */
     public static String SCHEDULES_KEY_SCHEDULED_RECORDING = "schedules_key_scheduled_recording";
 
-    private SchedulesHeaderRowPresenter mHeaderRowPresenter;
-    private ScheduleRowPresenter mRowPresenter;
     private ScheduleRowAdapter mRowsAdapter;
+    private TextView mEmptyInfoScreenView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ClassPresenterSelector presenterSelector = new ClassPresenterSelector();
-        mHeaderRowPresenter = onCreateHeaderRowPresenter();
-        mHeaderRowPresenter.addListener(this);
-        mRowPresenter = onCreateRowPresenter();
-        mRowPresenter.addListener(this);
-        presenterSelector.addClassPresenter(SchedulesHeaderRow.class, mHeaderRowPresenter);
-        presenterSelector.addClassPresenter(ScheduleRow.class, mRowPresenter);
+        presenterSelector.addClassPresenter(SchedulesHeaderRow.class, onCreateHeaderRowPresenter());
+        presenterSelector.addClassPresenter(ScheduleRow.class, onCreateRowPresenter());
         mRowsAdapter = onCreateRowsAdapter(presenterSelector);
         setAdapter(mRowsAdapter);
         mRowsAdapter.start();
-        TvApplication.getSingletons(getContext()).getDvrDataManager()
-                .addScheduledRecordingListener(this);
+        ApplicationSingletons singletons = TvApplication.getSingletons(getContext());
+        singletons.getDvrDataManager().addScheduledRecordingListener(this);
+        singletons.getDvrScheduleManager().addOnConflictStateChangeListener(this);
+        mEmptyInfoScreenView = (TextView) getActivity().findViewById(R.id.empty_info_screen);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+            Bundle savedInstanceState) {
+        View view = super.onCreateView(inflater, container, savedInstanceState);
+        int firstItemPosition = getFirstItemPosition();
+        if (firstItemPosition != -1) {
+            getRowsFragment().setSelectedPosition(firstItemPosition, false);
+        }
+        return view;
     }
 
     /**
@@ -73,34 +81,20 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
     /**
      * Shows the empty message.
      */
-    protected void showEmptyMessage(int message) {
-        TextView emptyInfoScreenView = (TextView) getActivity().findViewById(
-                R.id.empty_info_screen);
-        emptyInfoScreenView.setText(message);
-        emptyInfoScreenView.setVisibility(View.VISIBLE);
+    void showEmptyMessage(int messageId) {
+        mEmptyInfoScreenView.setText(messageId);
+        if (mEmptyInfoScreenView.getVisibility() != View.VISIBLE) {
+            mEmptyInfoScreenView.setVisibility(View.VISIBLE);
+        }
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-            Bundle savedInstanceState) {
-        View view = super.onCreateView(inflater, container, savedInstanceState);
-        // setSelectedPosition works only after the view is attached to a window.
-        view.getViewTreeObserver().addOnWindowAttachListener(
-                new ViewTreeObserver.OnWindowAttachListener() {
-            @Override
-            public void onWindowAttached() {
-                int firstItemPosition = getFirstItemPosition();
-                if (firstItemPosition != -1) {
-                    setSelectedPosition(firstItemPosition, false);
-                }
-                view.getViewTreeObserver().removeOnWindowAttachListener(this);
-            }
-
-            @Override
-            public void onWindowDetached() {
-            }
-        });
-        return view;
+    /**
+     * Hides the empty message.
+     */
+    void hideEmptyMessage() {
+        if (mEmptyInfoScreenView.getVisibility() == View.VISIBLE) {
+            mEmptyInfoScreenView.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -112,10 +106,9 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
 
     @Override
     public void onDestroy() {
-        TvApplication.getSingletons(getContext()).getDvrDataManager()
-                .removeScheduledRecordingListener(this);
-        mHeaderRowPresenter.removeListener(this);
-        mRowPresenter.removeListener(this);
+        ApplicationSingletons singletons = TvApplication.getSingletons(getContext());
+        singletons.getDvrScheduleManager().removeOnConflictStateChangeListener(this);
+        singletons.getDvrDataManager().removeScheduledRecordingListener(this);
         mRowsAdapter.stop();
         super.onDestroy();
     }
@@ -139,16 +132,6 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
      * Gets the first focus position in schedules list.
      */
     protected int getFirstItemPosition() {
-        Bundle args = getArguments();
-        ScheduledRecording recording = null;
-        if (args != null) {
-            recording = args.getParcelable(SCHEDULES_KEY_SCHEDULED_RECORDING);
-        }
-        final int selectedPostion = mRowsAdapter.indexOf(
-                mRowsAdapter.findRowByScheduledRecording(recording));
-        if (selectedPostion != -1) {
-            return selectedPostion;
-        }
         for (int i = 0; i < mRowsAdapter.size(); i++) {
             if (mRowsAdapter.get(i) instanceof ScheduleRow) {
                 return i;
@@ -159,11 +142,8 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
 
     @Override
     public void onScheduledRecordingAdded(ScheduledRecording... scheduledRecordings) {
-        for (ScheduledRecording recording : scheduledRecordings) {
-            if (mRowPresenter != null) {
-                mRowPresenter.onScheduledRecordingAdded(recording);
-            }
-            if (mRowsAdapter != null) {
+        if (mRowsAdapter != null) {
+            for (ScheduledRecording recording : scheduledRecordings) {
                 mRowsAdapter.onScheduledRecordingAdded(recording);
             }
         }
@@ -171,11 +151,8 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
 
     @Override
     public void onScheduledRecordingRemoved(ScheduledRecording... scheduledRecordings) {
-        for (ScheduledRecording recording : scheduledRecordings) {
-            if (mRowPresenter != null) {
-                mRowPresenter.onScheduledRecordingRemoved(recording);
-            }
-            if (mRowsAdapter != null) {
+        if (mRowsAdapter != null) {
+            for (ScheduledRecording recording : scheduledRecordings) {
                 mRowsAdapter.onScheduledRecordingRemoved(recording);
             }
         }
@@ -183,27 +160,19 @@ public abstract class BaseDvrSchedulesFragment extends DetailsFragment
 
     @Override
     public void onScheduledRecordingStatusChanged(ScheduledRecording... scheduledRecordings) {
-        for (ScheduledRecording recording : scheduledRecordings) {
-            if (mRowPresenter != null) {
-                mRowPresenter.onScheduledRecordingUpdated(recording);
-            }
-            if (mRowsAdapter != null) {
-                mRowsAdapter.onScheduledRecordingUpdated(recording);
-            }
-        }
-    }
-
-    @Override
-    public void onUpdateAllScheduleRows() {
-        if (getRowsAdapter() != null) {
-            getRowsAdapter().notifyArrayItemRangeChanged(0, getRowsAdapter().size());
-        }
-    }
-
-    @Override
-    public void onDeleteClicked(ScheduleRow scheduleRow) {
         if (mRowsAdapter != null) {
-            mRowsAdapter.notifyArrayItemRangeChanged(0, mRowsAdapter.size());
+            for (ScheduledRecording recording : scheduledRecordings) {
+                mRowsAdapter.onScheduledRecordingUpdated(recording, false);
+            }
+        }
+    }
+
+    @Override
+    public void onConflictStateChange(boolean conflict, ScheduledRecording... schedules) {
+        if (mRowsAdapter != null) {
+            for (ScheduledRecording recording : schedules) {
+                mRowsAdapter.onScheduledRecordingUpdated(recording, true);
+            }
         }
     }
 }

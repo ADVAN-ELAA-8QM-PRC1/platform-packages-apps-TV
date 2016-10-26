@@ -17,6 +17,7 @@
 package com.android.tv.dvr;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadata;
@@ -32,8 +33,10 @@ import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
+import com.android.tv.dvr.ui.DvrPlaybackOverlayFragment;
 import com.android.tv.util.ImageLoader;
 import com.android.tv.util.TimeShiftUtils;
+import com.android.tv.util.Utils;
 
 public class DvrPlaybackMediaSessionHelper {
     private static final String TAG = "DvrPlaybackMediaSessionHelper";
@@ -50,8 +53,8 @@ public class DvrPlaybackMediaSessionHelper {
     private final DvrWatchedPositionManager mDvrWatchedPositionManager;
     private final ChannelDataManager mChannelDataManager;
 
-    public DvrPlaybackMediaSessionHelper(Activity activity,
-            String mediaSessionTag, DvrPlayer dvrPlayer) {
+    public DvrPlaybackMediaSessionHelper(Activity activity, String mediaSessionTag,
+            DvrPlayer dvrPlayer, DvrPlaybackOverlayFragment overlayFragment) {
         mActivity = activity;
         mDvrPlayer = dvrPlayer;
         mDvrWatchedPositionManager =
@@ -69,6 +72,21 @@ public class DvrPlaybackMediaSessionHelper {
                 if (mDvrPlayer.isPlaybackPrepared()) {
                     mDvrWatchedPositionManager
                             .setWatchedPosition(mDvrPlayer.getProgram().getId(), positionMs);
+                }
+            }
+
+            @Override
+            public void onPlaybackEnded() {
+                // TODO: Deal with watched over recordings in DVR library
+                RecordedProgram nextEpisode =
+                        overlayFragment.getNextEpisode(mDvrPlayer.getProgram());
+                if (nextEpisode == null) {
+                    mDvrPlayer.reset();
+                    mActivity.finish();
+                } else {
+                    Intent intent = new Intent(activity, DvrPlaybackActivity.class);
+                    intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_ID, nextEpisode.getId());
+                    mActivity.startActivity(intent);
                 }
             }
         });
@@ -122,7 +140,7 @@ public class DvrPlaybackMediaSessionHelper {
      * Checks if the recorded program is the same as now playing one.
      */
     public boolean isCurrentProgram(RecordedProgram program) {
-        return program == null ? false : program.equals(getProgram());
+        return program != null && program.equals(getProgram());
     }
 
     /**
@@ -216,7 +234,7 @@ public class DvrPlaybackMediaSessionHelper {
     private void updateMediaMetadata(final long programId, final String title,
             final String subtitle, final long duration,
             final Bitmap posterArt, final int imageResId) {
-        new AsyncTask<Void, Void, Void> () {
+        new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... arg0) {
                 MediaMetadata.Builder builder = new MediaMetadata.Builder();
@@ -252,16 +270,23 @@ public class DvrPlaybackMediaSessionHelper {
 
         @Override
         public void onPlay() {
-            mDvrPlayer.play();
+            if (mDvrPlayer.isPlaybackPrepared()) {
+                mDvrPlayer.play();
+            }
         }
 
         @Override
         public void onPause() {
-            mDvrPlayer.pause();
+            if (mDvrPlayer.isPlaybackPrepared()) {
+                mDvrPlayer.pause();
+            }
         }
 
         @Override
         public void onFastForward() {
+            if (!mDvrPlayer.isPlaybackPrepared()) {
+                return;
+            }
             if (mDvrPlayer.getPlaybackState() == PlaybackState.STATE_FAST_FORWARDING) {
                 if (mSpeedLevel < TimeShiftUtils.MAX_SPEED_LEVEL) {
                     mSpeedLevel++;
@@ -277,6 +302,9 @@ public class DvrPlaybackMediaSessionHelper {
 
         @Override
         public void onRewind() {
+            if (!mDvrPlayer.isPlaybackPrepared()) {
+                return;
+            }
             if (mDvrPlayer.getPlaybackState() == PlaybackState.STATE_REWINDING) {
                 if (mSpeedLevel < TimeShiftUtils.MAX_SPEED_LEVEL) {
                     mSpeedLevel++;
@@ -291,7 +319,9 @@ public class DvrPlaybackMediaSessionHelper {
 
         @Override
         public void onSeekTo(long positionMs) {
-            mDvrPlayer.seekTo(positionMs);
+            if (mDvrPlayer.isPlaybackPrepared()) {
+                mDvrPlayer.seekTo(positionMs);
+            }
         }
     }
 }

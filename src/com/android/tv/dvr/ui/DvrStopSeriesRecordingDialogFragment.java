@@ -26,16 +26,16 @@ import android.view.ViewGroup;
 import com.android.tv.R;
 
 /**
- * A dialog fragment which contains {@link DvrCancelAllSeriesRecordingFragment}.
+ * A dialog fragment which contains {@link DvrStopSeriesRecordingFragment}.
  */
-public class DvrCancelAllSeriesRecordingDialogFragment extends DialogFragment {
+public class DvrStopSeriesRecordingDialogFragment extends DialogFragment {
     public static final String DIALOG_TAG = "dialog_tag";
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.halfsized_dialog, container, false);
-        GuidedStepFragment fragment = new DvrCancelAllSeriesRecordingFragment();
+        GuidedStepFragment fragment = new DvrStopSeriesRecordingFragment();
         fragment.setArguments(getArguments());
         GuidedStepFragment.add(getChildFragmentManager(), fragment, R.id.halfsized_dialog_host);
         return view;

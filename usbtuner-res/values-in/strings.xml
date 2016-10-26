@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"Gagal menyetel ke <xliff:g id="CHANNEL_NAME">%s</xliff:g>"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"Gagal menyetel"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"Perangkat lunak tuner ini baru saja diperbarui. Pindai ulang saluran Anda."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"Audio AC3 tidak tersedia"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"Aktifkan suara surround di setelan suara sistem untuk mengaktifkan audio"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"Penyiapan penyetel saluran"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"Penyiapan Tuner TV"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"Penyiapan tuner saluran USB"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"Penyiapan tuner TV"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"Penyiapan tuner saluran USB"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"Proses ini dapat memakan waktu beberapa menit"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"Tuner sementara tidak tersedia atau sudah digunakan oleh rekaman."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">%1$d saluran ditemukan</item>
       <item quantity="one">%1$d saluran ditemukan</item>

@@ -155,9 +155,9 @@
     <string name="tvview_msg_audio_only" msgid="1356866203687173329">"Ainult heli"</string>
     <string name="tvview_msg_weak_signal" msgid="1095050812622908976">"Nõrk signaal"</string>
     <string name="tvview_msg_no_internet_connection" msgid="7655994401188888231">"Interneti-ühendus puudub"</string>
-    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="7667615331469565106">
-      <item quantity="other">Seda kanalit ei saa kuni kellani <xliff:g id="END_TIME_1">%1$s</xliff:g> esitada, kuna kõiki tuunereid kasutatakse teiste saadete salvestamiseks. \n\nSalvestamise ajakava kohandamiseks vajutage paremnoolt.</item>
-      <item quantity="one">Seda kanalit ei saa kuni kellani <xliff:g id="END_TIME_0">%1$s</xliff:g> esitada, kuna tuunerit kasutatakse teiste saadete salvestamiseks. \n\nSalvestamise ajakava kohandamiseks vajutage paremnoolt.</item>
+    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="8581894855153658823">
+      <item quantity="other">Seda kanalit ei saa kuni kellani <xliff:g id="END_TIME_1">%1$s</xliff:g> esitada, kuna salvestatakse teisi kanaleid. \n\nSalvestamise ajakava kohandamiseks vajutage paremnoolt.</item>
+      <item quantity="one">Seda kanalit ei saa kuni kellani <xliff:g id="END_TIME_0">%1$s</xliff:g> esitada, kuna salvestatakse teist kanalit. \n\nSalvestamise ajakava kohandamiseks vajutage paremnoolt.</item>
     </plurals>
     <string name="channel_banner_no_title" msgid="8660301979190693176">"Pealkiri puudub"</string>
     <string name="channel_banner_locked_channel_title" msgid="2006564967318945980">"Kanal on blokeeritud"</string>
@@ -192,6 +192,7 @@
     <string name="msg_read_tv_listing_permission_denied" msgid="8882813301235518909">"Reaalajas kanalid vajavad telekavade lugemiseks luba."</string>
     <string name="setup_sources_text" msgid="4988039637873759839">"Allikate seadistamine"</string>
     <string name="setup_sources_description" msgid="5695518946225445202">"Reaalajakanalid ühendavad tavaliste telekanalite kasutuskogemuse ja rakendustes kanalite voogesitamise. \n\nAlustamiseks seadistage juba installitud kanaliallikad. Võite ka sirvida Google Play poodi, et hankida rakendusi, mis pakuvad reaalajakanaleid."</string>
+    <string name="channels_item_dvr" msgid="8911915252648532469">"Salvestised ja ajakavad"</string>
     <string name="recording_start_dialog_10_min_duration" msgid="5739636508245795292">"10 minutit"</string>
     <string name="recording_start_dialog_30_min_duration" msgid="4691127772622189977">"30 minutit"</string>
     <string name="recording_start_dialog_1_hour_duration" msgid="7159533207022355641">"1 tund"</string>
@@ -200,6 +201,8 @@
     <string name="dvr_main_scheduled" msgid="7837260963086408492">"Ajakavas´"</string>
     <string name="dvr_main_series" msgid="8278256687595691676">"Seeria"</string>
     <string name="dvr_main_others" msgid="2970835573614038153">"Muud"</string>
+    <string name="dvr_msg_cannot_record_channel" msgid="6836291367918532447">"Kanalit ei saa salvestada."</string>
+    <string name="dvr_msg_cannot_record_program" msgid="4184046342810946090">"Programmi ei saa salvestada."</string>
     <string name="dvr_msg_program_scheduled" msgid="3800847542300367572">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> on salvestamiseks ajastatud"</string>
     <string name="dvr_msg_current_program_scheduled" msgid="2505247201782991463">"Saate <xliff:g id="PROGRAMNAME">%1$s</xliff:g> salvestamine praegusest kuni <xliff:g id="ENDTIME">%2$s</xliff:g>"</string>
     <string name="dvr_full_schedule_card_view_title" msgid="7198521806965950089">"Kogu ajakava"</string>
@@ -227,9 +230,11 @@
     <string name="dvr_detail_play_from_beginning" msgid="8475543568260411836">"Esita algusest"</string>
     <string name="dvr_detail_resume_play" msgid="875591300274416373">"Jätka esitust"</string>
     <string name="dvr_detail_delete" msgid="4535881013528321898">"Kustuta"</string>
+    <string name="dvr_detail_series_delete" msgid="4831926831670312674">"Kustuta salvestised"</string>
     <string name="dvr_detail_series_resume" msgid="6935136228671386246">"Jätka"</string>
     <string name="dvr_detail_series_season_title" msgid="5474850936497854790">"<xliff:g id="SEASON_NUMBER">%1$s</xliff:g>. hooaeg"</string>
     <string name="dvr_detail_view_schedule" msgid="7137536927421904426">"Kuva ajakava"</string>
+    <string name="dvr_detail_read_more" msgid="2588920758094498544">"Lisateave"</string>
     <string name="dvr_series_deletion_title" msgid="7672649492494507574">"Salvestuste kustutamine"</string>
     <string name="dvr_series_deletion_description" msgid="994839237906552969">"Valige jaod, mille soovite kustutada. Pärast kustutamist ei saa neid enam taastada."</string>
     <string name="dvr_series_deletion_no_recordings" msgid="481210819034514">"Kustutamiseks pole salvestusi."</string>
@@ -246,17 +251,16 @@
     <string name="dvr_series_settings_priority" msgid="5836437092774185710">"Prioriteet"</string>
     <string name="dvr_series_settings_priority_highest" msgid="1072006447796648382">"Kõige kõrgem"</string>
     <string name="dvr_series_settings_priority_lowest" msgid="6003996497908810225">"Kõige madalam"</string>
+    <string name="dvr_series_settings_priority_rank" msgid="667778382820956116">"Nr <xliff:g id="RANK">%1$d</xliff:g>"</string>
     <string name="dvr_series_settings_channels" msgid="3164900110165729909">"Kanalid"</string>
     <string name="dvr_series_settings_channels_all" msgid="656434955168572976">"Kõik"</string>
     <string name="dvr_priority_title" msgid="1537886929061487213">"Prioriteedi valimine"</string>
-    <string name="dvr_priority_description" msgid="3653317573461947180">"Kui samal ajal programmide salvestamiseks pole piisavalt tuunereid, salvestatakse ainult kõige kõrgema prioriteediga programmid."</string>
+    <string name="dvr_priority_description" msgid="8362040921417154645">"Kui samal ajal salvestamiseks on liiga palju programme, salvestatakse ainult prioriteetsed programmid."</string>
     <string name="dvr_priority_button_action_save" msgid="4773524273649733008">"Salvesta"</string>
     <string name="dvr_priority_action_one_time_recording" msgid="8174297042282719478">"Ühekordsete salvestiste prioriteet on kõige kõrgem"</string>
     <string name="dvr_action_cancel" msgid="8094060199570272625">"Tühista"</string>
-    <!-- no translation found for dvr_action_error_cancel (6822474458738023531) -->
-    <skip />
-    <!-- no translation found for dvr_action_error_forget_storage (5869994565663655638) -->
-    <skip />
+    <string name="dvr_action_error_cancel" msgid="6822474458738023531">"Tühista"</string>
+    <string name="dvr_action_error_forget_storage" msgid="5869994565663655638">"Unusta"</string>
     <string name="dvr_action_stop" msgid="1378723485295471381">"Peata"</string>
     <string name="dvr_action_view_schedules" msgid="7442990695392774263">"Kuva salvestamise ajakava"</string>
     <string name="dvr_action_record_episode" msgid="8596182676610326327">"Ainult see saade"</string>
@@ -270,17 +274,21 @@
     <string name="dvr_epg_program_recording_scheduled" msgid="1367741844291055016">"Salvestamine on ajastatud"</string>
     <string name="dvr_epg_program_recording_conflict" msgid="4827911748865195373">"Konflikt salvestamisel"</string>
     <string name="dvr_epg_program_recording_in_progress" msgid="2158340443975313745">"Salvestamine"</string>
+    <string name="dvr_epg_program_recording_failed" msgid="5589124519442328896">"Salvestamine ebaõnnestus"</string>
     <string name="dvr_schedule_progress_message_reading_programs" msgid="6502513156469172313">"Programmide lugemine salvestusajakavade loomiseks"</string>
-    <!-- no translation found for dvr_error_missing_storage_title (691914341845362669) -->
+    <string name="dvr_series_schedules_progress_message_reading_programs" msgid="7221275889560136115">"Programmide lugemine"</string>
+    <!-- no translation found for dvr_series_schedules_progress_message_updating_programs (6670286486601662465) -->
     <skip />
-    <!-- no translation found for dvr_error_missing_storage_description (1036680750969954236) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_title (4996547357826788002) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_description (3973761741009546142) -->
-    <skip />
+    <string name="dvr_error_small_sized_storage_title" msgid="5020225460011469011">"DVR vajab rohkem salvestusruumi"</string>
+    <string name="dvr_error_small_sized_storage_description" msgid="8909789097974895119">"Saateid saate salvestada DVR-iga. Praegu pole teie seadmes DVR-i töötamiseks siiski piisavalt salvestusruumi. Ühendage väline ketas, mille maht on vähemalt <xliff:g id="STORAGE_SIZE">%1$s</xliff:g> GB, ja järgige juhiseid selle vormindamiseks salvestusseadmena."</string>
+    <string name="dvr_error_missing_storage_title" msgid="691914341845362669">"Puuduv salvestusruum"</string>
+    <string name="dvr_error_missing_storage_description" msgid="1036680750969954236">"Osa DVR-i kasutatavast salvestusruumist on puudu. DVR-i uuesti lubamiseks ühendage väline ketas, mida varem kasutasite. Teise võimalusena saate salvestusruumi unustada, kui see enam saadaval pole."</string>
+    <string name="dvr_error_forget_storage_title" msgid="4996547357826788002">"Kas unustada salvestusruum?"</string>
+    <string name="dvr_error_forget_storage_description" msgid="3973761741009546142">"Kogu teie salvestatud sisu ja ajakavad lähevad kaotsi."</string>
     <string name="dvr_stop_recording_dialog_title" msgid="2587018956502704278">"Kas peatada salvestamine?"</string>
-    <string name="dvr_stop_recording_dialog_description" msgid="8059817161905528708">"Salvestatud osa salvestatakse DVR-i kogusse."</string>
+    <string name="dvr_stop_recording_dialog_description" msgid="4637830189399967761">"Salvestatud sisu talletatakse."</string>
+    <!-- no translation found for dvr_stop_recording_dialog_description_on_conflict (7876857267536083760) -->
+    <skip />
     <string name="dvr_program_conflict_dialog_title" msgid="109323740107060379">"Salvestamine on ajastatud, ent ilmnesid vastuolud"</string>
     <string name="dvr_channel_conflict_dialog_title" msgid="7461033430572027786">"Salvestamine on alanud, kuid ilmnesid vastuolud"</string>
     <string name="dvr_program_conflict_dialog_description_prefix" msgid="5520062013211648196">"Saadet <xliff:g id="PROGRAMNAME">%1$s</xliff:g> salvestatakse."</string>
@@ -298,6 +306,14 @@
     <string name="dvr_already_scheduled_dialog_description" msgid="8170126125996414810">"Sama saate salvestus on juba lisatud ajakavva algusega <xliff:g id="PROGRAMSTARTTIME">%1$s</xliff:g>."</string>
     <string name="dvr_already_recorded_dialog_title" msgid="2760294707162057216">"Juba salvestatud"</string>
     <string name="dvr_already_recorded_dialog_description" msgid="8966051583682746434">"See saade on juba salvestatud. See on saadaval DVR-i kogus."</string>
+    <!-- no translation found for dvr_series_recording_dialog_title (3521956660855853797) -->
+    <skip />
+    <!-- no translation found for dvr_series_recording_scheduled_no_conflict (2796926724821316879) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_this_series_conflict (2800805130979023066) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_one_conflict (3632394665556633158) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_conflict (2331412040101938479) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_one_conflict (5213169239215104024) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_conflict (5159645486201045330) -->
     <string name="dvr_program_not_found" msgid="3282879532038010202">"Salvestatud programmi ei leitud."</string>
     <string name="dvr_playback_related_recordings" msgid="6978658039329924961">"Seotud salvestised"</string>
     <string name="dvr_msg_no_program_description" msgid="2521723281247322645">"(Programmi kirjeldust pole)"</string>
@@ -310,15 +326,21 @@
     <string name="dvr_schedules_tuner_conflict_will_be_partially_recorded" msgid="5280490298546908729">"Salvestatakse tuuneri konfliktide tõttu osaliselt."</string>
     <string name="dvr_schedules_tuner_conflict_will_not_be_recorded_info" msgid="5065400564003201095">"Ei salvestata tuuneri konfliktide tõttu."</string>
     <string name="dvr_schedules_empty_state" msgid="1291529283469462741">"Ajakavas ei ole veel salvestusi.\nSalvestuse saate ajakavva lisada saatekavas."</string>
-    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="5687216771746946005">
-      <item quantity="other">Salvestamise ajakava järgmiseks %1$d päevaks</item>
-      <item quantity="one">Salvestamise ajakava järgmiseks %1$d päevaks</item>
+    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="9077188267856194114">
+      <item quantity="other">%1$d salvestamise konflikti</item>
+      <item quantity="one">%1$d salvestamise konflikt</item>
     </plurals>
-    <string name="dvr_series_schedules_settings" msgid="4069530935369561001">"Seaded"</string>
-    <string name="dvr_series_schedules_dialog_back" msgid="1594678171444843646">"Tagasi"</string>
-    <string name="dvr_series_schedules_undo" msgid="7445942340901896865">"Võta tagasi"</string>
+    <string name="dvr_series_schedules_settings" msgid="4868501926847903985">"Seeria seaded"</string>
+    <string name="dvr_series_schedules_start" msgid="8458768834047133835">"Alusta seeria salvestam."</string>
+    <string name="dvr_series_schedules_stop" msgid="3427479298317584961">"Peata seeria salvestamine"</string>
+    <string name="dvr_series_schedules_stop_dialog_title" msgid="4975886236535334420">"Kas peatada seeria salvestamine?"</string>
+    <string name="dvr_series_schedules_stop_dialog_description" msgid="7547266283366940085">"Salvestatud jaod jäävad saadavale DVR-i kogusse."</string>
+    <string name="dvr_series_schedules_stop_dialog_action_stop" msgid="2351839914865142478">"Peata"</string>
     <string name="dvr_series_schedules_empty_state" msgid="3407962945399698707">"Ükski osa pole saadaval.\nNeed salvestatakse siis, kui need kättesaadavaks muutuvad."</string>
-    <!-- no translation found for dvr_schedules_recording_duration (3701771573063918552) -->
+    <plurals name="dvr_schedules_recording_duration" formatted="false" msgid="3701771573063918552">
+      <item quantity="other">(%1$d minutit)</item>
+      <item quantity="one">(%1$d minut) </item>
+    </plurals>
     <string name="dvr_date_today" msgid="7691050705354303471">"Täna"</string>
     <string name="dvr_date_tomorrow" msgid="4136735681186981844">"Homme"</string>
     <string name="dvr_date_yesterday" msgid="2127672919053118239">"Eile"</string>

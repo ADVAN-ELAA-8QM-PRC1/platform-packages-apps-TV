@@ -107,6 +107,11 @@
         <item name="guidedActionItemCheckmarkStyle">@style/TV.Dvr.Series.Deletion.guidedActionItemCheckmarkStyle</item>
     </style>
 
+    <style name="Theme.TV.Dvr.Series.Settings.GuidedStep" parent="Theme.TV.Dvr.Settings.GuidedStep">
+        <item name="android:windowBackground">@color/setup_background</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
     <style name="Theme.TV.Dvr.Browse.Details" parent="Theme.Leanback.Details">
         <item name="detailsDescriptionTitleStyle">@style/TV.Dvr.Browse.DetailsDescriptionTitleStyle</item>
     </style>

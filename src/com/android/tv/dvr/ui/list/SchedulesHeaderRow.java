@@ -16,8 +16,6 @@
 
 package com.android.tv.dvr.ui.list;
 
-import android.support.annotation.Nullable;
-
 import com.android.tv.dvr.SeriesRecording;
 
 /**
@@ -88,13 +86,6 @@ public abstract class SchedulesHeaderRow {
         }
 
         /**
-         * Sets the latest time of the list which belongs to the header row.
-         */
-        public void setDeadLineMs(long deadLineMs) {
-            mDeadLineMs = deadLineMs;
-        }
-
-        /**
          * Returns the latest time of the list which belongs to the header row.
          */
         public long getDeadLineMs() {
@@ -106,35 +97,26 @@ public abstract class SchedulesHeaderRow {
      * The header row which represent the series recording.
      */
     public static class SeriesRecordingHeaderRow extends SchedulesHeaderRow {
-        private SeriesRecording mSeries;
-        private boolean mCancelAllChecked;
+        private SeriesRecording mSeriesRecording;
 
         public SeriesRecordingHeaderRow(String title, String description, int itemCount,
                 SeriesRecording series) {
             super(title, description, itemCount);
-            mSeries = series;
-            mCancelAllChecked = series.getState() == SeriesRecording.STATE_SERIES_CANCELED;
-        }
-
-        /**
-         * Sets cancel all checked status.
-         */
-        public void setCancelAllChecked(boolean checked) {
-            mCancelAllChecked = checked;
-        }
-
-        /**
-         * Returns cancel all checked status.
-         */
-        public boolean isCancelAllChecked() {
-            return mCancelAllChecked;
+            mSeriesRecording = series;
         }
 
         /**
          * Returns the series recording, it is for series schedules list.
          */
         public SeriesRecording getSeriesRecording() {
-            return mSeries;
+            return mSeriesRecording;
+        }
+
+        /**
+         * Sets the series recording.
+         */
+        public void setSeriesRecording(SeriesRecording seriesRecording) {
+            mSeriesRecording = seriesRecording;
         }
     }
 }

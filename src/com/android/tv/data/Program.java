@@ -260,6 +260,7 @@ public final class Program extends BaseProgram implements Comparable<Program>, P
     /**
      * Returns the series ID.
      */
+    @Override
     public String getSeriesId() {
         return mSeriesId;
     }
@@ -400,6 +401,7 @@ public final class Program extends BaseProgram implements Comparable<Program>, P
     /**
      * Returns array of canonical genre ID's for this program.
      */
+    @Override
     public int[] getCanonicalGenreIds() {
         return mCanonicalGenreIds;
     }

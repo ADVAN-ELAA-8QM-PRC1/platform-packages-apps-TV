@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.support.v17.leanback.app.DetailsFragment;
 
 import com.android.tv.R;
+import com.android.tv.TvApplication;
 
 /**
  * Activity to show details view in DVR.
@@ -69,6 +70,7 @@ public class DvrDetailsActivity extends Activity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        TvApplication.setCurrentRunningProcess(this, true);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dvr_details);
         long recordId = getIntent().getLongExtra(RECORDING_ID, -1);

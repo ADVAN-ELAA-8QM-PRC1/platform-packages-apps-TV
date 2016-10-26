@@ -37,6 +37,7 @@ import com.android.tv.tuner.tvinput.TunerDebug;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 /**
  * Decodes and renders AC3 audio.
@@ -105,6 +106,7 @@ public class Ac3PassthroughTrackRenderer extends TrackRenderer implements MediaC
     private long mInterpolatedTimeUs;
     private long mPreviousPositionUs;
     private boolean mIsStopped;
+    private ArrayList<Integer> mTracksIndex;
 
     public Ac3PassthroughTrackRenderer(SampleSource source, Handler eventHandler,
             EventListener listener) {
@@ -120,6 +122,7 @@ public class Ac3PassthroughTrackRenderer extends TrackRenderer implements MediaC
         mCodecCounters = new CodecCounters();
         mMonitor = new AudioTrackMonitor();
         mAudioClock = new AudioClock();
+        mTracksIndex = new ArrayList<>();
     }
 
     @Override
@@ -139,8 +142,10 @@ public class Ac3PassthroughTrackRenderer extends TrackRenderer implements MediaC
         }
         for (int i = 0; i < mSource.getTrackCount(); i++) {
             if (handlesMimeType(mSource.getFormat(i).mimeType)) {
-                mTrackIndex = i;
-                return true;
+                if (mTrackIndex < 0) {
+                    mTrackIndex = i;
+                }
+                mTracksIndex.add(i);
             }
         }
 
@@ -150,18 +155,19 @@ public class Ac3PassthroughTrackRenderer extends TrackRenderer implements MediaC
 
     @Override
     protected int getTrackCount() {
-        return mTrackIndex < 0 ? 0 : 1;
+        return mTracksIndex.size();
     }
 
     @Override
     protected MediaFormat getFormat(int track) {
-        Assertions.checkArgument(mTrackIndex != -1 && track == 0);
-        return mSource.getFormat(mTrackIndex);
+        Assertions.checkArgument(track >= 0 && track < mTracksIndex.size());
+        return mSource.getFormat(mTracksIndex.get(track));
     }
 
     @Override
     protected void onEnabled(int track, long positionUs, boolean joining) {
-        Assertions.checkArgument(mTrackIndex != -1 && track == 0);
+        Assertions.checkArgument(track >= 0 && track < mTracksIndex.size());
+        mTrackIndex = mTracksIndex.get(track);
         mSource.enable(mTrackIndex, positionUs);
         seekToInternal(positionUs);
     }

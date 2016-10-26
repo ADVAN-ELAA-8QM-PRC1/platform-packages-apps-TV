@@ -28,8 +28,6 @@ import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrManager;
-import com.android.tv.dvr.ScheduledRecording;
-import com.android.tv.dvr.SeriesRecording;
 
 import java.util.List;
 
@@ -77,14 +75,7 @@ public class DvrForgetStorageErrorFragment extends DvrGuidedStepFragment {
             return;
         }
         DvrManager dvrManager = TvApplication.getSingletons(getContext()).getDvrManager();
-        DvrDataManager dataManager = TvApplication.getSingletons(getContext()).getDvrDataManager();
-        List<SeriesRecording> seriesRecordings = dataManager.getSeriesRecordings(mInputId);
-        for(SeriesRecording series : seriesRecordings) {
-            dvrManager.removeSeriesRecording(series.getId());
-        }
-        List<ScheduledRecording> scheduledRecordings = dataManager.getScheduledRecordings(mInputId);
-        dvrManager.removeScheduledRecording(ScheduledRecording.toArray(scheduledRecordings));
-        dvrManager.removeRecordedProgramByMissingStorage(mInputId);
+        dvrManager.forgetStorage(mInputId);
         Activity activity = getActivity();
         if (activity instanceof DvrDetailsActivity) {
             // Since we removed everything, just finish the activity.

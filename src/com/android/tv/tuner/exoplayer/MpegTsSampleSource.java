@@ -154,6 +154,9 @@ public final class MpegTsSampleSource implements SampleSource, SampleSourceReade
         if (mPreparationError != null) {
             throw mPreparationError;
         }
+        if (mSampleExtractor != null) {
+            mSampleExtractor.maybeThrowError();
+        }
     }
 
     @Override

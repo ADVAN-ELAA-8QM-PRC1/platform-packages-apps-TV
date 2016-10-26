@@ -155,9 +155,9 @@
     <string name="tvview_msg_audio_only" msgid="1356866203687173329">"Audio uniquement"</string>
     <string name="tvview_msg_weak_signal" msgid="1095050812622908976">"Signal faible"</string>
     <string name="tvview_msg_no_internet_connection" msgid="7655994401188888231">"Aucune connexion Internet"</string>
-    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="7667615331469565106">
-      <item quantity="one">Impossible de visionner cette chaîne jusqu\'à <xliff:g id="END_TIME_1">%1$s</xliff:g>, car le syntoniseur est utilisé pour enregistrer d\'autres programmes. \n\nAppuyez sur la touche de droite pour ajuster l\'horaire d\'enregistrement.</item>
-      <item quantity="other">Impossible de visionner cette chaîne jusqu\'à <xliff:g id="END_TIME_1">%1$s</xliff:g>, car tous les syntoniseurs sont utilisés pour enregistrer d\'autres programmes. \n\nAppuyez sur la touche de droite pour ajuster l\'horaire d\'enregistrement.</item>
+    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="8581894855153658823">
+      <item quantity="one">Impossible de visionner cette chaîne jusqu\'à <xliff:g id="END_TIME_1">%1$s</xliff:g>, car un autre programme est en cours d\'enregistrement. \n\nAppuyez sur la touche de droite pour modifier l\'horaire d\'enregistrement.</item>
+      <item quantity="other">Impossible de visionner cette chaîne jusqu\'à <xliff:g id="END_TIME_1">%1$s</xliff:g>, car d\'autres programmes sont en cours d\'enregistrement. \n\nAppuyez sur la touche de droite pour modifier l\'horaire d\'enregistrement.</item>
     </plurals>
     <string name="channel_banner_no_title" msgid="8660301979190693176">"Sans titre"</string>
     <string name="channel_banner_locked_channel_title" msgid="2006564967318945980">"Chaîne bloquée"</string>
@@ -192,6 +192,7 @@
     <string name="msg_read_tv_listing_permission_denied" msgid="8882813301235518909">"Les chaînes en direct ont besoin de l\'autorisation nécessaire pour lire les programmes télé."</string>
     <string name="setup_sources_text" msgid="4988039637873759839">"Configurez vos sources"</string>
     <string name="setup_sources_description" msgid="5695518946225445202">"Avec Télé en direct, diffusez les chaînes proposées par des applications comme s\'il s\'agissait de chaînes de télévision traditionnelles. \n\nCommencez par configurer les sources de chaînes déjà installées. Vous pouvez également parcourir la boutique Google Play Store et rechercher d\'autres applications qui proposent des chaînes en direct."</string>
+    <string name="channels_item_dvr" msgid="8911915252648532469">"Enregistrements et horaires"</string>
     <string name="recording_start_dialog_10_min_duration" msgid="5739636508245795292">"10 minutes"</string>
     <string name="recording_start_dialog_30_min_duration" msgid="4691127772622189977">"30 minutes"</string>
     <string name="recording_start_dialog_1_hour_duration" msgid="7159533207022355641">"1 heure"</string>
@@ -200,6 +201,8 @@
     <string name="dvr_main_scheduled" msgid="7837260963086408492">"Prévu"</string>
     <string name="dvr_main_series" msgid="8278256687595691676">"Série"</string>
     <string name="dvr_main_others" msgid="2970835573614038153">"Autres"</string>
+    <string name="dvr_msg_cannot_record_channel" msgid="6836291367918532447">"Impossible d\'enregistrer ce canal"</string>
+    <string name="dvr_msg_cannot_record_program" msgid="4184046342810946090">"Impossible d\'enregistrer ce programme."</string>
     <string name="dvr_msg_program_scheduled" msgid="3800847542300367572">"Vous avez planifié l\'enregistrement du programme « <xliff:g id="PROGRAMNAME">%1$s</xliff:g> »"</string>
     <string name="dvr_msg_current_program_scheduled" msgid="2505247201782991463">"Enregistrement du programme <xliff:g id="PROGRAMNAME">%1$s</xliff:g> de maintenant jusqu\'à <xliff:g id="ENDTIME">%2$s</xliff:g>…"</string>
     <string name="dvr_full_schedule_card_view_title" msgid="7198521806965950089">"Calendrier complet"</string>
@@ -227,9 +230,11 @@
     <string name="dvr_detail_play_from_beginning" msgid="8475543568260411836">"Lire du début"</string>
     <string name="dvr_detail_resume_play" msgid="875591300274416373">"Reprendre la lecture"</string>
     <string name="dvr_detail_delete" msgid="4535881013528321898">"Supprimer"</string>
+    <string name="dvr_detail_series_delete" msgid="4831926831670312674">"Supprimer les enregistrements"</string>
     <string name="dvr_detail_series_resume" msgid="6935136228671386246">"Reprendre"</string>
     <string name="dvr_detail_series_season_title" msgid="5474850936497854790">"Saison <xliff:g id="SEASON_NUMBER">%1$s</xliff:g>"</string>
     <string name="dvr_detail_view_schedule" msgid="7137536927421904426">"Voir l\'horaire"</string>
+    <string name="dvr_detail_read_more" msgid="2588920758094498544">"En savoir plus"</string>
     <string name="dvr_series_deletion_title" msgid="7672649492494507574">"Supprim. enregistr."</string>
     <string name="dvr_series_deletion_description" msgid="994839237906552969">"Sélectionnez les épisodes que vous souhaitez supprimer. Ceux-ci ne peuvent pas être récupérés une fois cette opération effectuée."</string>
     <string name="dvr_series_deletion_no_recordings" msgid="481210819034514">"Aucun enregistrement à supprimer."</string>
@@ -246,17 +251,16 @@
     <string name="dvr_series_settings_priority" msgid="5836437092774185710">"Priorité"</string>
     <string name="dvr_series_settings_priority_highest" msgid="1072006447796648382">"La plus élevée"</string>
     <string name="dvr_series_settings_priority_lowest" msgid="6003996497908810225">"La plus faible"</string>
+    <string name="dvr_series_settings_priority_rank" msgid="667778382820956116">"Non. <xliff:g id="RANK">%1$d</xliff:g>"</string>
     <string name="dvr_series_settings_channels" msgid="3164900110165729909">"Chaînes"</string>
     <string name="dvr_series_settings_channels_all" msgid="656434955168572976">"Tout"</string>
     <string name="dvr_priority_title" msgid="1537886929061487213">"Choisissez la priorité"</string>
-    <string name="dvr_priority_description" msgid="3653317573461947180">"Lorsqu\'il n\'y a pas assez de syntoniseurs pour enregistrer des programmes simultanément, seuls les programmes aux priorités les plus élevées sont enregistrés."</string>
+    <string name="dvr_priority_description" msgid="8362040921417154645">"Quand il y a trop de programmes à enregistrer en même temps, seuls ceux aux priorités les plus élevées sont enregistrés."</string>
     <string name="dvr_priority_button_action_save" msgid="4773524273649733008">"Enregistrer"</string>
     <string name="dvr_priority_action_one_time_recording" msgid="8174297042282719478">"Les enregistrements ponctuels ont la plus haute priorité"</string>
     <string name="dvr_action_cancel" msgid="8094060199570272625">"Annuler"</string>
-    <!-- no translation found for dvr_action_error_cancel (6822474458738023531) -->
-    <skip />
-    <!-- no translation found for dvr_action_error_forget_storage (5869994565663655638) -->
-    <skip />
+    <string name="dvr_action_error_cancel" msgid="6822474458738023531">"Annuler"</string>
+    <string name="dvr_action_error_forget_storage" msgid="5869994565663655638">"Supprimer"</string>
     <string name="dvr_action_stop" msgid="1378723485295471381">"Arrêter"</string>
     <string name="dvr_action_view_schedules" msgid="7442990695392774263">"Voir le programme d\'enregistrement"</string>
     <string name="dvr_action_record_episode" msgid="8596182676610326327">"Uniquement ce programme"</string>
@@ -270,17 +274,21 @@
     <string name="dvr_epg_program_recording_scheduled" msgid="1367741844291055016">"Enregistrement programmé"</string>
     <string name="dvr_epg_program_recording_conflict" msgid="4827911748865195373">"Conflit d\'enregistrement"</string>
     <string name="dvr_epg_program_recording_in_progress" msgid="2158340443975313745">"Enregistrement en cours"</string>
+    <string name="dvr_epg_program_recording_failed" msgid="5589124519442328896">"Échec de l\'enregistrement"</string>
     <string name="dvr_schedule_progress_message_reading_programs" msgid="6502513156469172313">"Lecture des programmes pour créer des horaires d\'enregistrement…"</string>
-    <!-- no translation found for dvr_error_missing_storage_title (691914341845362669) -->
+    <string name="dvr_series_schedules_progress_message_reading_programs" msgid="7221275889560136115">"Lecture des programmes en cours…"</string>
+    <!-- no translation found for dvr_series_schedules_progress_message_updating_programs (6670286486601662465) -->
     <skip />
-    <!-- no translation found for dvr_error_missing_storage_description (1036680750969954236) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_title (4996547357826788002) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_description (3973761741009546142) -->
-    <skip />
+    <string name="dvr_error_small_sized_storage_title" msgid="5020225460011469011">"Le magnétoscope numérique a besoin de plus d\'espace"</string>
+    <string name="dvr_error_small_sized_storage_description" msgid="8909789097974895119">"Vous pourrez enregistrer des programmes avec le magnétoscope numérique. Toutefois, l\'espace de stockage est insuffisant sur votre appareil pour que le magnétoscope numérique puisse fonctionner actuellement. Veuillez brancher un disque externe d\'au moins <xliff:g id="STORAGE_SIZE">%1$s</xliff:g> Go ou suivez les étapes pour le formater en tant qu\'espace de stockage de l\'appareil."</string>
+    <string name="dvr_error_missing_storage_title" msgid="691914341845362669">"Espace de stockage manquant"</string>
+    <string name="dvr_error_missing_storage_description" msgid="1036680750969954236">"Une partie de l\'espace de stockage utilisé par le magnétoscope numérique est manquante. Veuillez connecter de nouveau le disque externe que vous avez utilisé auparavant afin de réactiver le magnétoscope numérique. Vous pouvez également supprimer cet espace de stockage s\'il n\'est plus disponible."</string>
+    <string name="dvr_error_forget_storage_title" msgid="4996547357826788002">"Supprimer l\'espace de stockage?"</string>
+    <string name="dvr_error_forget_storage_description" msgid="3973761741009546142">"Tous vos contenus enregistrés et vos enregistrements planifiés seront perdus."</string>
     <string name="dvr_stop_recording_dialog_title" msgid="2587018956502704278">"Arrêter l\'enregistrement?"</string>
-    <string name="dvr_stop_recording_dialog_description" msgid="8059817161905528708">"La section enregistrée sera stockée dans la bibliothèque du magnétoscope numérique."</string>
+    <string name="dvr_stop_recording_dialog_description" msgid="4637830189399967761">"Le contenu enregistré sera gardé."</string>
+    <!-- no translation found for dvr_stop_recording_dialog_description_on_conflict (7876857267536083760) -->
+    <skip />
     <string name="dvr_program_conflict_dialog_title" msgid="109323740107060379">"Enregistrement planifié, mais d\'autres enregistrements sont prévus en même temps."</string>
     <string name="dvr_channel_conflict_dialog_title" msgid="7461033430572027786">"L\'enregistrement a commencé, mais d\'autres enregistrements sont prévus en même temps"</string>
     <string name="dvr_program_conflict_dialog_description_prefix" msgid="5520062013211648196">"Le programme « <xliff:g id="PROGRAMNAME">%1$s</xliff:g> » sera enregistré."</string>
@@ -298,6 +306,14 @@
     <string name="dvr_already_scheduled_dialog_description" msgid="8170126125996414810">"Vous avez déjà planifié l\'enregistrement de ce programme à <xliff:g id="PROGRAMSTARTTIME">%1$s</xliff:g>."</string>
     <string name="dvr_already_recorded_dialog_title" msgid="2760294707162057216">"Déjà enregistré"</string>
     <string name="dvr_already_recorded_dialog_description" msgid="8966051583682746434">"Ce programme a déjà été enregistré. Il est accessible dans la bibliothèque du magnétoscope numérique."</string>
+    <!-- no translation found for dvr_series_recording_dialog_title (3521956660855853797) -->
+    <skip />
+    <!-- no translation found for dvr_series_recording_scheduled_no_conflict (2796926724821316879) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_this_series_conflict (2800805130979023066) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_one_conflict (3632394665556633158) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_conflict (2331412040101938479) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_one_conflict (5213169239215104024) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_conflict (5159645486201045330) -->
     <string name="dvr_program_not_found" msgid="3282879532038010202">"Programme enregistré non trouvé."</string>
     <string name="dvr_playback_related_recordings" msgid="6978658039329924961">"Enregistrements connexes"</string>
     <string name="dvr_msg_no_program_description" msgid="2521723281247322645">"(Programme sans description)"</string>
@@ -310,15 +326,21 @@
     <string name="dvr_schedules_tuner_conflict_will_be_partially_recorded" msgid="5280490298546908729">"Sera partiellement enreg. en raison de conflits de syntoniseur"</string>
     <string name="dvr_schedules_tuner_conflict_will_not_be_recorded_info" msgid="5065400564003201095">"Ne sera pas enregistré en raison de conflits de syntoniseur"</string>
     <string name="dvr_schedules_empty_state" msgid="1291529283469462741">"Aucun enregistrement n\'est encore planifié.\nVous pouvez programmer des enregistrements à partir du guide des programmes."</string>
-    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="5687216771746946005">
-      <item quantity="one">Enregistrement programmé pour le jour suivant (%1$d)</item>
-      <item quantity="other">Enregistrement programmé pour les %1$d jours suivants</item>
+    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="9077188267856194114">
+      <item quantity="one">%1$d conflit d\'enregistrement</item>
+      <item quantity="other">%1$d conflits d\'enregistrement</item>
     </plurals>
-    <string name="dvr_series_schedules_settings" msgid="4069530935369561001">"Paramètres"</string>
-    <string name="dvr_series_schedules_dialog_back" msgid="1594678171444843646">"Précédent"</string>
-    <string name="dvr_series_schedules_undo" msgid="7445942340901896865">"Annuler"</string>
+    <string name="dvr_series_schedules_settings" msgid="4868501926847903985">"Paramètres de la série"</string>
+    <string name="dvr_series_schedules_start" msgid="8458768834047133835">"Commencer à enregistrer la série"</string>
+    <string name="dvr_series_schedules_stop" msgid="3427479298317584961">"Arrêter d\'enregistrer la série"</string>
+    <string name="dvr_series_schedules_stop_dialog_title" msgid="4975886236535334420">"Arrêter l\'enregistrement de la série?"</string>
+    <string name="dvr_series_schedules_stop_dialog_description" msgid="7547266283366940085">"Les épisodes enregistrés resteront accessibles dans la bibliothèque du magnétoscope numérique."</string>
+    <string name="dvr_series_schedules_stop_dialog_action_stop" msgid="2351839914865142478">"Arrêter"</string>
     <string name="dvr_series_schedules_empty_state" msgid="3407962945399698707">"Aucun épisode.\nLes épisodes seront enregistrés lorsqu\'ils seront diffusés."</string>
-    <!-- no translation found for dvr_schedules_recording_duration (3701771573063918552) -->
+    <plurals name="dvr_schedules_recording_duration" formatted="false" msgid="3701771573063918552">
+      <item quantity="one">(%1$d minute)</item>
+      <item quantity="other">(%1$d minutes)</item>
+    </plurals>
     <string name="dvr_date_today" msgid="7691050705354303471">"Aujourd\'hui"</string>
     <string name="dvr_date_tomorrow" msgid="4136735681186981844">"Demain"</string>
     <string name="dvr_date_yesterday" msgid="2127672919053118239">"Hier"</string>

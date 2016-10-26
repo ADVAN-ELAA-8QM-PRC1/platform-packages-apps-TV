@@ -35,6 +35,8 @@ public class HalfSizedDialogFragment extends SafeDismissDialogFragment {
 
     private static final long AUTO_DISMISS_TIME_THRESHOLD_MS = TimeUnit.SECONDS.toMillis(30);
 
+    private OnActionClickListener mOnActionClickListener;
+
     private Handler mHandler = new Handler();
     private Runnable mAutoDismisser = new Runnable() {
         @Override
@@ -63,6 +65,16 @@ public class HalfSizedDialogFragment extends SafeDismissDialogFragment {
     }
 
     @Override
+    public void onPause() {
+        super.onPause();
+        if (mOnActionClickListener != null) {
+            // Dismisses the dialog to prevent the callback being forgotten during
+            // fragment re-creating.
+            dismiss();
+        }
+    }
+
+    @Override
     public void onStop() {
         super.onStop();
         mHandler.removeCallbacks(mAutoDismisser);
@@ -76,5 +88,30 @@ public class HalfSizedDialogFragment extends SafeDismissDialogFragment {
     @Override
     public String getTrackerLabel() {
         return TRACKER_LABEL;
+    }
+
+    /**
+     * Sets {@link OnActionClickListener} for the dialog fragment. If listener is set, the dialog
+     * will be automatically closed when it's paused to prevent the fragment being re-created by
+     * the framework, which will result the listener being forgotten.
+     */
+    public void setOnActionClickListener(OnActionClickListener listener) {
+        mOnActionClickListener = listener;
+    }
+
+    /**
+     * Returns {@link OnActionClickListener} for sub-classes or any inner fragments.
+     */
+    protected OnActionClickListener getOnActionClickListener() {
+        return mOnActionClickListener;
+    }
+
+    /**
+     * An interface to provide callbacks for half-sized dialogs. Subclasses or inner fragments
+     * should invoke {@link OnActionClickListener#onActionClick(long)} and provide the identifier
+     * of the action user clicked.
+     */
+    public interface OnActionClickListener {
+        void onActionClick(long actionId);
     }
 }

@@ -17,7 +17,6 @@
 package com.android.tv.dvr.ui;
 
 import android.annotation.TargetApi;
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -27,7 +26,6 @@ import android.support.v17.leanback.app.GuidedStepFragment;
 import android.support.v17.leanback.widget.GuidanceStylist.Guidance;
 import android.support.v17.leanback.widget.GuidedAction;
 import android.text.format.DateUtils;
-import android.widget.Toast;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
@@ -37,10 +35,10 @@ import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.dvr.SeriesRecording;
-import com.android.tv.dvr.SeriesRecordingScheduler.ProgramLoadCallback;
 import com.android.tv.dvr.ui.DvrConflictFragment.DvrProgramConflictFragment;
 import com.android.tv.util.Utils;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -50,6 +48,8 @@ import java.util.List;
  */
 @TargetApi(Build.VERSION_CODES.N)
 public class DvrScheduleFragment extends DvrGuidedStepFragment {
+    private static final String TAG = "DvrScheduleFragment";
+
     private static final int ACTION_RECORD_EPISODE = 1;
     private static final int ACTION_RECORD_SERIES = 2;
 
@@ -62,8 +62,12 @@ public class DvrScheduleFragment extends DvrGuidedStepFragment {
             mProgram = args.getParcelable(DvrHalfSizedDialogFragment.KEY_PROGRAM);
         }
         DvrManager dvrManager = TvApplication.getSingletons(getContext()).getDvrManager();
-        SoftPreconditions.checkArgument(mProgram != null && mProgram.isEpisodic()
-                && dvrManager.getSeriesRecording(mProgram) == null);
+        SoftPreconditions.checkArgument(mProgram != null && mProgram.isEpisodic(), TAG,
+                "The program should be episodic: " + mProgram);
+        SeriesRecording seriesRecording = dvrManager.getSeriesRecording(mProgram);
+        SoftPreconditions.checkArgument(seriesRecording == null
+                || seriesRecording.isStopped(), TAG,
+                "The series recording should be stopped or null: " + seriesRecording);
         super.onCreate(savedInstanceState);
     }
 
@@ -122,19 +126,22 @@ public class DvrScheduleFragment extends DvrGuidedStepFragment {
                         R.id.halfsized_dialog_host);
             }
         } else if (action.getId() == ACTION_RECORD_SERIES) {
-            ProgressDialog dialog = ProgressDialog.show(getContext(), null,
-                    getString(R.string.dvr_schedule_progress_message_reading_programs));
-            getDvrManager().queryProgramsForSeries(mProgram, new ProgramLoadCallback() {
-                @Override
-                public void onProgramLoadFinished(@NonNull List<Program> programs) {
-                    dialog.dismiss();
-                    // TODO: Create series recording in series settings fragment.
-                    SeriesRecording seriesRecording =
-                            getDvrManager().addSeriesRecording(mProgram, programs);
-                    DvrUiHelper.startSeriesSettingsActivity(getContext(), seriesRecording.getId());
-                    dismissDialog();
-                }
-            });
+            SeriesRecording seriesRecording = TvApplication.getSingletons(getContext())
+                    .getDvrDataManager().getSeriesRecording(mProgram.getSeriesId());
+            if (seriesRecording == null) {
+                seriesRecording = getDvrManager().addSeriesRecording(mProgram,
+                        Collections.emptyList(), SeriesRecording.STATE_SERIES_STOPPED);
+            } else {
+                // Reset priority to the highest.
+                seriesRecording = SeriesRecording.buildFrom(seriesRecording)
+                        .setPriority(TvApplication.getSingletons(getContext())
+                                .getDvrScheduleManager().suggestNewSeriesPriority())
+                        .build();
+                getDvrManager().updateSeriesRecording(seriesRecording);
+            }
+            DvrUiHelper.startSeriesSettingsActivity(getContext(),
+                    seriesRecording.getId(), null, true, true, true);
+            dismissDialog();
         }
     }
 }

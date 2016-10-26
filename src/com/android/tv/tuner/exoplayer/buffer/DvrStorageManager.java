@@ -61,8 +61,11 @@ public class DvrStorageManager implements BufferManager.StorageManager {
     @Override
     public void clearStorage() {
         if (mIsRecording) {
-            for (File file : mBufferDir.listFiles()) {
-                file.delete();
+            File[] files = mBufferDir.listFiles();
+            if (files != null && files.length > 0) {
+                for (File file : files) {
+                    file.delete();
+                }
             }
         }
     }

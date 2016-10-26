@@ -20,6 +20,7 @@ import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteException;
 import android.media.tv.TvContract;
 import android.media.tv.TvContract.Programs;
 import android.net.Uri;
@@ -82,8 +83,13 @@ public class ProgramUtils {
 
             if (list.size() >= MAX_DB_INSERT_COUNT_AT_ONCE
                     || timeMs >= targetEndTimeMs) {
-                context.getContentResolver().bulkInsert(Programs.CONTENT_URI,
-                        list.toArray(new ContentValues[list.size()]));
+                try {
+                    context.getContentResolver().bulkInsert(Programs.CONTENT_URI,
+                            list.toArray(new ContentValues[list.size()]));
+                } catch (SQLiteException e) {
+                    Log.e(TAG, "Can't insert EPG.", e);
+                    return;
+                }
                 if (DEBUG) Log.d(TAG, "Inserted " + list.size() + " programs for " + channelUri);
                 list.clear();
             }

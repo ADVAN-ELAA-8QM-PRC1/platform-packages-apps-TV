@@ -126,6 +126,13 @@ public class DvrPlaybackControlHelper extends PlaybackControlGlue {
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if (mReadyToControl) {
+            if (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE && event.getAction() == KeyEvent.ACTION_DOWN
+                    && (mPlaybackState == PlaybackState.STATE_FAST_FORWARDING
+                    || mPlaybackState == PlaybackState.STATE_REWINDING)) {
+                // Workaround of b/31489271. Clicks play/pause button first to reset play controls
+                // to "play" state. Then we can pass MEDIA_PAUSE to let playback be paused.
+                onActionClicked(getControlsRow().getActionForKeyCode(keyCode));
+            }
             return super.onKey(v, keyCode, event);
         }
         return false;
@@ -134,10 +141,7 @@ public class DvrPlaybackControlHelper extends PlaybackControlGlue {
     @Override
     public boolean hasValidMedia() {
         PlaybackState playbackState = mMediaController.getPlaybackState();
-        if (playbackState == null) {
-            return false;
-        }
-        return true;
+        return playbackState != null;
     }
 
     @Override

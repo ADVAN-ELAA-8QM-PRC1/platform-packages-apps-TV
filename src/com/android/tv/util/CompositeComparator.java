@@ -14,11 +14,29 @@
  * limitations under the License.
  */
 
-package com.android.tv.tuner;
+package com.android.tv.util;
+
+import java.util.Comparator;
 
 /**
- * Defines flags which are useful for experimenting new feature on tuner implementation.
+ * A comparator which runs multiple comparators sequentially.
  */
-public final class TunerFlags {
-    public static final boolean USE_EXTRACTOR_IN_EXOPLAYER = false;
+public class CompositeComparator<T> implements Comparator<T> {
+    private final Comparator<T>[] mComparators;
+
+    @SafeVarargs
+    public CompositeComparator(Comparator<T>... comparators) {
+        mComparators = comparators;
+    }
+
+    @Override
+    public int compare(T lhs, T rhs) {
+        for (Comparator<T> comparator : mComparators) {
+            int result = comparator.compare(lhs, rhs);
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
+    }
 }

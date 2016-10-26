@@ -41,10 +41,17 @@ import java.util.List;
 public interface SampleExtractor {
 
     /**
+     * If the extractor is currently having difficulty preparing or loading samples, then this
+     * method throws the underlying error. Otherwise does nothing.
+     *
+     * @throws IOException The underlying error.
+     */
+    void maybeThrowError() throws IOException;
+
+    /**
     * Prepares the extractor for reading track metadata and samples.
     *
-    * @return whether the source is ready; if {@code false}, {@link #prepare()} must be called
-     *        again
+    * @return whether the source is ready; if {@code false}, this method must be called again.
     * @throws IOException thrown if the source can't be read
     */
     boolean prepare() throws IOException;
@@ -109,12 +116,12 @@ public interface SampleExtractor {
      * @param listener the OnCompletionListener
      * @param handler the {@link Handler} for {@link Handler#post(Runnable)} of OnCompletionListener
      */
-    public void setOnCompletionListener(OnCompletionListener listener, Handler handler);
+    void setOnCompletionListener(OnCompletionListener listener, Handler handler);
 
     /**
      * The listener for SampleExtractor being completed.
      */
-    public interface OnCompletionListener {
+    interface OnCompletionListener {
 
         /**
          * Called when sample extraction is completed.

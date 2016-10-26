@@ -52,7 +52,6 @@ public class PrioritySettingsFragment extends GuidedStepFragment {
     // button action's IDs are negative.
     private static final long ACTION_ID_SAVE = -100L;
 
-    private DvrDataManager mDvrDataManager;
     private final List<SeriesRecording> mSeriesRecordings = new ArrayList<>();
 
     private SeriesRecording mSelectedRecording;
@@ -64,23 +63,23 @@ public class PrioritySettingsFragment extends GuidedStepFragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        mDvrDataManager = TvApplication.getSingletons(context).getDvrDataManager();
         mSeriesRecordings.clear();
         mSeriesRecordings.add(new SeriesRecording.Builder()
                 .setTitle(getString(R.string.dvr_priority_action_one_time_recording))
                 .setPriority(Long.MAX_VALUE)
                 .setId(ONE_TIME_RECORDING_ID)
                 .build());
+        DvrDataManager dvrDataManager = TvApplication.getSingletons(context).getDvrDataManager();
         long comeFromSeriesRecordingId =
                 getArguments().getLong(COME_FROM_SERIES_RECORDING_ID, -1);
-        for (SeriesRecording series : mDvrDataManager.getSeriesRecordings()) {
+        for (SeriesRecording series : dvrDataManager.getSeriesRecordings()) {
             if (series.getState() == SeriesRecording.STATE_SERIES_NORMAL
                     || series.getId() == comeFromSeriesRecordingId) {
                 mSeriesRecordings.add(series);
             }
         }
         mSeriesRecordings.sort(SeriesRecording.PRIORITY_COMPARATOR);
-        mComeFromSeriesRecording = mDvrDataManager.getSeriesRecording(comeFromSeriesRecordingId);
+        mComeFromSeriesRecording = dvrDataManager.getSeriesRecording(comeFromSeriesRecordingId);
         mSelectedActionElevation = getResources().getDimension(R.dimen.card_elevation_normal);
         mActionColor = getResources().getColor(R.color.dvr_guided_step_action_text_color, null);
         mSelectedActionColor =

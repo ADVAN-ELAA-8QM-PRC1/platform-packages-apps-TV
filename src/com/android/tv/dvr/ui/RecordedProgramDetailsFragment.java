@@ -16,11 +16,8 @@
 
 package com.android.tv.dvr.ui;
 
-import android.content.Intent;
 import android.content.res.Resources;
-import android.media.tv.TvContentRating;
 import android.media.tv.TvInputManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.v17.leanback.widget.Action;
 import android.support.v17.leanback.widget.OnActionClickedListener;
@@ -30,40 +27,38 @@ import android.text.TextUtils;
 import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.Channel;
-import com.android.tv.dialog.PinDialogFragment;
+import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrManager;
-import com.android.tv.dvr.DvrPlaybackActivity;
-import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.DvrWatchedPositionManager;
 import com.android.tv.dvr.RecordedProgram;
-import com.android.tv.parental.ParentalControlSettings;
-import com.android.tv.util.TvInputManagerHelper;
-import com.android.tv.util.Utils;
-
-import java.io.File;
 
 /**
  * {@link DetailsFragment} for recorded program in DVR.
  */
-public class RecordedProgramDetailsFragment extends DvrDetailsFragment {
+public class RecordedProgramDetailsFragment extends DvrDetailsFragment
+        implements DvrDataManager.RecordedProgramListener {
     private static final int ACTION_RESUME_PLAYING = 1;
     private static final int ACTION_PLAY_FROM_BEGINNING = 2;
     private static final int ACTION_DELETE_RECORDING = 3;
 
     private DvrWatchedPositionManager mDvrWatchedPositionManager;
-    private TvInputManagerHelper mTvInputManagerHelper;
 
     private RecordedProgram mRecordedProgram;
     private DetailsContent mDetailsContent;
     private boolean mPaused;
+    private DvrDataManager mDvrDataManager;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        mDvrDataManager = TvApplication.getSingletons(getContext()).getDvrDataManager();
+        mDvrDataManager.addRecordedProgramListener(this);
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    public void onCreateInternal() {
         mDvrWatchedPositionManager = TvApplication.getSingletons(getActivity())
                 .getDvrWatchedPositionManager();
-        mTvInputManagerHelper = TvApplication.getSingletons(getActivity())
-                .getTvInputManagerHelper();
         setDetailsOverviewRow(mDetailsContent);
     }
 
@@ -83,10 +78,15 @@ public class RecordedProgramDetailsFragment extends DvrDetailsFragment {
     }
 
     @Override
+    public void onDestroy() {
+        mDvrDataManager.removeRecordedProgramListener(this);
+        super.onDestroy();
+    }
+
+    @Override
     protected boolean onLoadRecordingDetails(Bundle args) {
         long recordedProgramId = args.getLong(DvrDetailsActivity.RECORDING_ID);
-        mRecordedProgram = TvApplication.getSingletons(getActivity()).getDvrDataManager()
-                .getRecordedProgram(recordedProgramId);
+        mRecordedProgram = mDvrDataManager.getRecordedProgram(recordedProgramId);
         if (mRecordedProgram == null) {
             // notify super class to end activity before initializing anything
             return false;
@@ -114,8 +114,8 @@ public class RecordedProgramDetailsFragment extends DvrDetailsFragment {
         SparseArrayObjectAdapter adapter =
                 new SparseArrayObjectAdapter(new ActionPresenterSelector());
         Resources res = getResources();
-        if (mDvrWatchedPositionManager.getWatchedPosition(mRecordedProgram.getId())
-                != TvInputManager.TIME_SHIFT_INVALID_TIME) {
+        if (mDvrWatchedPositionManager.getWatchedStatus(mRecordedProgram)
+                == DvrWatchedPositionManager.DVR_WATCHED_STATUS_WATCHING) {
             adapter.set(ACTION_RESUME_PLAYING, new Action(ACTION_RESUME_PLAYING,
                     res.getString(R.string.dvr_detail_resume_play), null,
                     res.getDrawable(R.drawable.lb_ic_play)));
@@ -139,9 +139,9 @@ public class RecordedProgramDetailsFragment extends DvrDetailsFragment {
             @Override
             public void onActionClicked(Action action) {
                 if (action.getId() == ACTION_PLAY_FROM_BEGINNING) {
-                    startPlayback(TvInputManager.TIME_SHIFT_INVALID_TIME);
+                    startPlayback(mRecordedProgram, TvInputManager.TIME_SHIFT_INVALID_TIME);
                 } else if (action.getId() == ACTION_RESUME_PLAYING) {
-                    startPlayback(mDvrWatchedPositionManager
+                    startPlayback(mRecordedProgram, mDvrWatchedPositionManager
                             .getWatchedPosition(mRecordedProgram.getId()));
                 } else if (action.getId() == ACTION_DELETE_RECORDING) {
                     DvrManager dvrManager = TvApplication
@@ -153,66 +153,18 @@ public class RecordedProgramDetailsFragment extends DvrDetailsFragment {
         };
     }
 
-    private boolean isDataUriAccessible(Uri dataUri) {
-        if (dataUri == null || dataUri.getPath() == null) {
-            return false;
-        }
-        try {
-            File recordedProgramPath = new File(dataUri.getPath());
-            if (recordedProgramPath.exists()) {
-                return true;
+    @Override
+    public void onRecordedProgramsAdded(RecordedProgram... recordedPrograms) { }
+
+    @Override
+    public void onRecordedProgramsChanged(RecordedProgram... recordedPrograms) { }
+
+    @Override
+    public void onRecordedProgramsRemoved(RecordedProgram... recordedPrograms) {
+        for (RecordedProgram recordedProgram : recordedPrograms) {
+            if (recordedProgram.getId() == mRecordedProgram.getId()) {
+                getActivity().finish();
             }
-        } catch (SecurityException e) {
         }
-        return false;
-    }
-
-    private void startPlayback(long seekTimeMs) {
-        if (Utils.isInBundledPackageSet(mRecordedProgram.getPackageName())
-                && !isDataUriAccessible(mRecordedProgram.getDataUri())) {
-            // Currently missing storage is handled only for TunerTvInput.
-            DvrUiHelper.showDvrMissingStorageErrorDialog(getActivity(),
-                    mRecordedProgram.getInputId());
-            return;
-        }
-        ParentalControlSettings parental = mTvInputManagerHelper.getParentalControlSettings();
-        if (!parental.isParentalControlsEnabled()) {
-            launchPlaybackActivity(seekTimeMs, false);
-            return;
-        }
-        String ratingString = mRecordedProgram.getContentRating();
-        if (TextUtils.isEmpty(ratingString)) {
-            launchPlaybackActivity(seekTimeMs, false);
-            return;
-        }
-        String[] ratingList = ratingString.split(",");
-        TvContentRating[] programRatings = new TvContentRating[ratingList.length];
-        for (int i = 0; i < ratingList.length; i++) {
-            programRatings[i] = TvContentRating.unflattenFromString(ratingList[i]);
-        }
-        TvContentRating blockRatings = parental.getBlockedRating(programRatings);
-        if (blockRatings != null) {
-            new PinDialogFragment(PinDialogFragment.PIN_DIALOG_TYPE_UNLOCK_PROGRAM,
-                    new PinDialogFragment.ResultListener() {
-                        @Override
-                        public void done(boolean success) {
-                            if (success) {
-                                launchPlaybackActivity(seekTimeMs, true);
-                            }
-                        }
-                    }).show(getActivity().getFragmentManager(), PinDialogFragment.DIALOG_TAG);
-        } else {
-            launchPlaybackActivity(seekTimeMs, false);
-        }
-    }
-
-    private void launchPlaybackActivity(long seekTimeMs, boolean pinChecked) {
-        Intent intent = new Intent(getActivity(), DvrPlaybackActivity.class);
-        intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_ID, mRecordedProgram.getId());
-        if (seekTimeMs != TvInputManager.TIME_SHIFT_INVALID_TIME) {
-            intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_SEEK_TIME, seekTimeMs);
-        }
-        intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_PIN_CHECKED, pinChecked);
-        getActivity().startActivity(intent);
     }
 }

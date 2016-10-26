@@ -38,12 +38,6 @@ public class ScanResultFragment extends SetupMultiPaneFragment {
     public static final String ACTION_CATEGORY =
             "com.android.tv.tuner.setup.ScanResultFragment";
 
-    /**
-     * An action which moves to previous page when the user presses BACK button.
-     * In some cases, more than one page can be popped out.
-     */
-    public static final int ACTION_BACK_TO_CONNECTION_TYPE = ACTION_DONE - 1;
-
     @Override
     protected SetupGuidedStepFragment onCreateContentFragment() {
         return new ContentFragment();

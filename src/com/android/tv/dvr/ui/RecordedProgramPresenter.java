@@ -21,13 +21,11 @@ import android.content.Context;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputManager;
 import android.net.Uri;
-import android.support.v17.leanback.widget.Presenter;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.TextAppearanceSpan;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
 import com.android.tv.R;
@@ -35,7 +33,6 @@ import com.android.tv.TvApplication;
 import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
-import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.DvrWatchedPositionManager;
 import com.android.tv.dvr.DvrWatchedPositionManager.WatchedPositionChangedListener;
 import com.android.tv.util.Utils;
@@ -45,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Presents a {@link RecordedProgram} in the {@link DvrBrowseFragment}.
  */
-public class RecordedProgramPresenter extends Presenter implements OnClickListener {
+public class RecordedProgramPresenter extends DvrItemPresenter {
     private final ChannelDataManager mChannelDataManager;
     private final DvrWatchedPositionManager mDvrWatchedPositionManager;
     private final Context mContext;
@@ -108,20 +105,16 @@ public class RecordedProgramPresenter extends Presenter implements OnClickListen
     public void onBindViewHolder(ViewHolder viewHolder, Object o) {
         final RecordedProgram program = (RecordedProgram) o;
         final RecordingCardView cardView = (RecordingCardView) viewHolder.view;
-        cardView.setTag(program);
         Channel channel = mChannelDataManager.getChannel(program.getChannelId());
-        SpannableString title;
-        if (mShowEpisodeTitle) {
-            title = new SpannableString(program.getEpisodeDisplayTitle(mContext));
-        } else {
-            String titleWithEpisodeNumber = program.getTitleWithEpisodeNumber(mContext);
-            title = titleWithEpisodeNumber == null ? null
-                    : new SpannableString(titleWithEpisodeNumber);
-        }
+        String titleString = mShowEpisodeTitle ? program.getEpisodeDisplayTitle(mContext)
+                : program.getTitleWithEpisodeNumber(mContext);
+        SpannableString title = titleString == null ? null : new SpannableString(titleString);
         if (TextUtils.isEmpty(title)) {
             title = new SpannableString(channel != null ? channel.getDisplayName()
                     : mContext.getResources().getString(R.string.no_program_information));
         } else if (!mShowEpisodeTitle) {
+            // TODO: Some translation may add delimiters in-between program titles, we should use
+            // a more robust way to get the span range.
             String programTitle = program.getTitle();
             title.setSpan(new TextAppearanceSpan(mContext,
                     R.style.text_appearance_card_view_episode_number), programTitle == null ? 0
@@ -144,7 +137,6 @@ public class RecordedProgramPresenter extends Presenter implements OnClickListen
         String durationString = getContext().getResources().getQuantityString(
                 R.plurals.dvr_program_duration, durationMinutes, durationMinutes);
         cardView.setContent(getDescription(program), durationString);
-        viewHolder.view.setOnClickListener(this);
         if (viewHolder instanceof RecordedProgramViewHolder) {
             RecordedProgramViewHolder cardViewHolder = (RecordedProgramViewHolder) viewHolder;
             cardViewHolder.setProgram(program);
@@ -152,6 +144,7 @@ public class RecordedProgramPresenter extends Presenter implements OnClickListen
             cardViewHolder
                     .setProgressBar(mDvrWatchedPositionManager.getWatchedPosition(program.getId()));
         }
+        super.onBindViewHolder(viewHolder, o);
     }
 
     @Override
@@ -161,14 +154,7 @@ public class RecordedProgramPresenter extends Presenter implements OnClickListen
                     ((RecordedProgramViewHolder) viewHolder).mProgram.getId());
         }
         ((RecordingCardView) viewHolder.view).reset();
-    }
-
-    @Override
-    public void onClick(View v) {
-        if (v instanceof RecordingCardView) {
-            DvrUiHelper.startDetailsActivity((Activity) mContext, (RecordedProgram) v.getTag(),
-                    ((RecordingCardView) v).getImageView());
-        }
+        super.onUnbindViewHolder(viewHolder);
     }
 
     /**

@@ -26,7 +26,6 @@ import android.view.ViewGroup;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
-import com.android.tv.common.ui.setup.OnActionClickListener;
 import com.android.tv.common.ui.setup.SetupActionHelper;
 import com.android.tv.util.SetupUtils;
 
@@ -47,8 +46,6 @@ public class NewSourcesFragment extends Fragment {
      * An action to close this fragment.
      */
     public static final int ACTION_SKIP = 2;
-
-    private OnActionClickListener mOnActionClickListener;
 
     public NewSourcesFragment() {
         setAllowEnterTransitionOverlap(false);

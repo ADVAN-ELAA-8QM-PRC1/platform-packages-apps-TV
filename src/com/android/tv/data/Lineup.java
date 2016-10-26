@@ -46,7 +46,6 @@ public class Lineup {
      */
     public final String location;
 
-    /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({LINEUP_CABLE, LINEUP_SATELLITE, LINEUP_BROADCAST_DIGITAL, LINEUP_BROADCAST_ANALOG,
             LINEUP_IPTV, LINEUP_MVPD})

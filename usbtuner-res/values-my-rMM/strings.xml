@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"<xliff:g id="CHANNEL_NAME">%s</xliff:g> သို့ ချိန်ညှိခြင်း မအောင်မြင်ပါ"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"ချိန်ညှိ၍ မရခဲ့ပါ"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"ချန်နယ်ချိန်ဆော့ဖ်ဝဲကို မကြာသေးမီက အပ်ဒိတ်လုပ်ခဲ့သည်။ ချန်နယ်လိုင်းများကို ပြန်ရှာပါ။"</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"AC3 အသံစနစ်ကို အသုံးမပြုနိုင်သေးပါ"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"အသံဖွင့်ရန် ပတ်ပတ်လည်အသံစနစ်ဆက်တင်များကို ဖွင့်ပါ"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"ချန်နယ်ချိန်ကိရိယာ ထည့်သွင်းတပ်ဆင်မှု"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"တီဗီချန်နယ်ချိန်ကိရိယာ ပြင်ဆင်သတ်မှတ်မှု"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"USB ချန်နယ်ချိန်ကိရိယာ ပြင်ဆင်သတ်မှတ်မှု"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"တီဗီချန်နယ်ချိန်ကိရိယာ ပြင်ဆင်သတ်မှတ်မှု"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"USB ချန်နယ်ချိန်ကိရိယာ ပြင်ဆင်သတ်မှတ်မှု"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"မိနစ်အနည်းငယ် ကြာနိုင်ပါသည်"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"လိုင်းချိန်စက်သည် ယာယီမရနိုင်သေးပါ သို့မဟုတ် ဖမ်းယူခြင်းအတွက် အသုံးပြုနေပြီး ဖြစ်ပါသည်။"</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">ချန်နယ် %1$d လိုင်းတွေ့သည်</item>
       <item quantity="one">ချန်နယ် %1$d လိုင်းတွေ့သည်</item>

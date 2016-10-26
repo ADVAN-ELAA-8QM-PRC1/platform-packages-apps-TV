@@ -18,6 +18,8 @@ package com.android.tv.tuner.exoplayer.buffer;
 
 import android.content.Context;
 import android.media.MediaFormat;
+import android.os.AsyncTask;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Pair;
 
@@ -64,8 +66,24 @@ public class TrickplayStorageManager implements BufferManager.StorageManager {
 
     @Override
     public void clearStorage() {
-        for (File file : mBufferDir.listFiles()) {
-            file.delete();
+        File files[] = mBufferDir.listFiles();
+        if (files == null || files.length == 0) {
+            return;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            new AsyncTask<Void, Void, Void>() {
+                @Override
+                protected Void doInBackground(Void... params) {
+                    for (File file : files) {
+                        file.delete();
+                    }
+                    return null;
+                }
+            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        } else {
+            for (File file : files) {
+                file.delete();
+            }
         }
     }
 

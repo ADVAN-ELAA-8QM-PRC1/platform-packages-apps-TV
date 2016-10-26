@@ -27,6 +27,7 @@ import android.support.test.filters.SdkSuppress;
 import android.support.test.filters.SmallTest;
 import android.test.AndroidTestCase;
 
+import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.Program;
 
 import org.mockito.Mock;
@@ -52,12 +53,14 @@ public class DvrDbSyncTest extends AndroidTestCase {
 
     private DvrDbSync mDbSync;
     @Mock private DvrDataManagerImpl mDataManager;
+    @Mock private ChannelDataManager mChannelDataManager;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         MockitoAnnotations.initMocks(this);
-        mDbSync = new DvrDbSync(getContext(), mDataManager);
+        when(mChannelDataManager.isDbLoadFinished()).thenReturn(true);
+        mDbSync = new DvrDbSync(getContext(), mDataManager, mChannelDataManager);
     }
 
     public void testHandleUpdateProgram_null() {

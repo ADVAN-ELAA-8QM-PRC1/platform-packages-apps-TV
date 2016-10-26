@@ -27,7 +27,7 @@
     <string name="ut_fail_to_tune" msgid="2964582177222053143">"Kanalile <xliff:g id="CHANNEL_NAME">%s</xliff:g> häälestamine ebaõnnestus"</string>
     <string name="ut_fail_to_tune_to_unknown_channel" msgid="7078953579048783762">"Häälestamine ebaõnnestus"</string>
     <string name="ut_rescan_needed" msgid="2273655435759849436">"Tuuneri tarkvara värskendati hiljuti. Otsige kanaleid uuesti."</string>
-    <string name="ut_ac3_passthrough_unavailable" msgid="7523756232660190058">"AC3-heli pole saadaval"</string>
+    <string name="ut_surround_sound_disabled" msgid="6465044734143962900">"Heli lubamiseks lubage ruumiline heli süsteemi heliseadetes"</string>
     <string name="ut_setup_breadcrumb" msgid="2810318605327367247">"Kanalituuneri seadistus"</string>
     <string name="bt_setup_new_title" msgid="8447554965697762891">"Telerituuneri seadistus"</string>
     <string name="ut_setup_new_title" msgid="2118880835101453405">"USB-kanalituuneri seadistus"</string>
@@ -55,6 +55,7 @@
     <string name="bt_channel_scan" msgid="3291924771702347469">"Telerituuneri seadistus"</string>
     <string name="ut_channel_scan" msgid="6100090671500464604">"USB-kanalituuneri seadistus"</string>
     <string name="ut_channel_scan_time" msgid="1844845425359642393">"See võib võtta mitu minutit"</string>
+    <string name="ut_channel_scan_tuner_unavailable" msgid="3135723754380409658">"Tuuner pole ajutiselt saadaval või seda kasutatakse juba salvestamiseks."</string>
     <plurals name="ut_channel_scan_message" formatted="false" msgid="3131606783282632056">
       <item quantity="other">Leiti %1$d kanalit</item>
       <item quantity="one">Leiti %1$d kanal</item>

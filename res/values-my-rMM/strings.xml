@@ -155,9 +155,9 @@
     <string name="tvview_msg_audio_only" msgid="1356866203687173329">"အသံ သီးသန့်"</string>
     <string name="tvview_msg_weak_signal" msgid="1095050812622908976">"လှိုင်းဆွဲအားနည်းသည်"</string>
     <string name="tvview_msg_no_internet_connection" msgid="7655994401188888231">"အင်တာနက်ချိတ်ဆက်မှု မရှိပါ"</string>
-    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="7667615331469565106">
-      <item quantity="other">လိုင်းဖမ်းစက်ကို အခြားအစီအစဉ် ဖမ်းယူရာ၌ အသုံးပြုနေသောကြောင့် ဤချန်နယ်အား <xliff:g id="END_TIME_1">%1$s</xliff:g> အထိ ဖွင့်၍ရမည်မဟုတ်ပါ။ \n\nဖမ်းယူခြင်းအချိန်ဇယားကို ချိန်ညှိရန် ညာဘက်ကိုနှိပ်ပါ။</item>
-      <item quantity="one">လိုင်းဖမ်းစက်ကို အခြားအစီအစဉ် ဖမ်းယူရာ၌ အသုံးပြုနေသောကြောင့် ဤချန်နယ်အား <xliff:g id="END_TIME_0">%1$s</xliff:g> အထိ ဖွင့်၍ရမည်မဟုတ်ပါ။ \n\nဖမ်းယူခြင်းအချိန်ဇယားကို ချိန်ညှိရန် ညာဘက်ကိုနှိပ်ပါ။</item>
+    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="8581894855153658823">
+      <item quantity="other">အခြားချန်နယ်လိုင်းများကို ဖမ်းယူနေသောကြောင့် ဤချန်နယ်လိုင်းကို <xliff:g id="END_TIME_1">%1$s</xliff:g> အထိ ဖွင့်၍ရမည်မဟုတ်ပါ။ \n\nဖမ်းယူခြင်းအချိန်ဇယားကို ချိန်ညှိရန် ညာဘက်ကိုနှိပ်ပါ။</item>
+      <item quantity="one">အခြားချန်နယ်လိုင်းကို ဖမ်းယူနေသောကြောင့် ဤချန်နယ်လိုင်းကို <xliff:g id="END_TIME_0">%1$s</xliff:g> အထိ ဖွင့်၍ရမည်မဟုတ်ပါ။ \n\nဖမ်းယူခြင်းအချိန်ဇယားကို ချိန်ညှိရန် ညာဘက်ကိုနှိပ်ပါ။</item>
     </plurals>
     <string name="channel_banner_no_title" msgid="8660301979190693176">"ခေါင်းစဉ် မပါ"</string>
     <string name="channel_banner_locked_channel_title" msgid="2006564967318945980">"ချာနယ် ပိတ်ဆို့ထား"</string>
@@ -192,6 +192,7 @@
     <string name="msg_read_tv_listing_permission_denied" msgid="8882813301235518909">"တီဗီစာရင်းများကို ဖတ်ရှုရန် တိုက်ရိုက်ထုတ်လွှင့်သောချန်နယ်လိုင်းများတွင် ခွင့်ပြူချက်လိုအပ်သည်။"</string>
     <string name="setup_sources_text" msgid="4988039637873759839">"သင့်သတင်းအရင်းအမြစ်များကို တပ်ဆင်ပါ"</string>
     <string name="setup_sources_description" msgid="5695518946225445202">"တိုက်ရိုက်လွှင့်သည့် ချန်နယ်များသည် သမားရိုးကျ TV ချန်နယ်များနှင့် အက်ပ်မှလွှင့်ပေးသည့် ချန်နယ်များကို ပူးပေါင်းထားသည့်ခံစားမှုပင်ဖြစ်သည်။ \n\nထည့်သွင်းပြီးသား ချန်နယ်အရင်းမြစ်များကို တပ်ဆင်ခြင်းဖြင့် စတင်လိုက်ပါ။ သို့မဟုတ် တိုက်ရိုက်လွှင့်သည့် ချန်နယ်များပါဝင်သည့် နောက်ထပ်အက်ပ်များအတွက် Google Play Store တွင်ရှာပါ။"</string>
+    <string name="channels_item_dvr" msgid="8911915252648532469">"ဖမ်းယူခြင်းနှင့် အချိန်ဇယားမျာ"</string>
     <string name="recording_start_dialog_10_min_duration" msgid="5739636508245795292">"၁၀ မိနစ်"</string>
     <string name="recording_start_dialog_30_min_duration" msgid="4691127772622189977">"၃၀ မိနစ်"</string>
     <string name="recording_start_dialog_1_hour_duration" msgid="7159533207022355641">"၁ နာရီ"</string>
@@ -200,6 +201,8 @@
     <string name="dvr_main_scheduled" msgid="7837260963086408492">"စီစဉ်ထားသော"</string>
     <string name="dvr_main_series" msgid="8278256687595691676">"စီးရီး"</string>
     <string name="dvr_main_others" msgid="2970835573614038153">"အခြား"</string>
+    <string name="dvr_msg_cannot_record_channel" msgid="6836291367918532447">"ချန်နယ်ကို မှတ်တမ်းတင်၍မရပါ။"</string>
+    <string name="dvr_msg_cannot_record_program" msgid="4184046342810946090">"ပရိုဂရမ်ကို မှတ်တမ်းတင်၍ မရပါ။"</string>
     <string name="dvr_msg_program_scheduled" msgid="3800847542300367572">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> ကို ဖမ်းယူရန် စီစဉ်ထားပါသည်"</string>
     <string name="dvr_msg_current_program_scheduled" msgid="2505247201782991463">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> ကို ယခုချိန်မှ <xliff:g id="ENDTIME">%2$s</xliff:g> အထိ ရိုက်ကူးမည်"</string>
     <string name="dvr_full_schedule_card_view_title" msgid="7198521806965950089">"အချိန်ဇယားအပြည့်အစုံ"</string>
@@ -227,9 +230,11 @@
     <string name="dvr_detail_play_from_beginning" msgid="8475543568260411836">"အစမှနေ၍ ဖွင့်ရန်"</string>
     <string name="dvr_detail_resume_play" msgid="875591300274416373">"ဆက်ဖွင့်ရန်"</string>
     <string name="dvr_detail_delete" msgid="4535881013528321898">"ဖျက်ရန်"</string>
+    <string name="dvr_detail_series_delete" msgid="4831926831670312674">"မှတ်တမ်းတင်ထားသည်ကို ဖျက်ရန်"</string>
     <string name="dvr_detail_series_resume" msgid="6935136228671386246">"ဆက်ဖွင့်ရန်"</string>
     <string name="dvr_detail_series_season_title" msgid="5474850936497854790">"အတွဲ <xliff:g id="SEASON_NUMBER">%1$s</xliff:g>"</string>
     <string name="dvr_detail_view_schedule" msgid="7137536927421904426">"အချိန်ဇယားကိုကြည့်ရန်"</string>
+    <string name="dvr_detail_read_more" msgid="2588920758094498544">"နောက်ထပ် ဖတ်ရန်"</string>
     <string name="dvr_series_deletion_title" msgid="7672649492494507574">"ရုပ်သံကူးယူမှုဖျက်ပါ"</string>
     <string name="dvr_series_deletion_description" msgid="994839237906552969">"သင်ဖျက်ပစ်လိုသော အခန်းဆက်များကို ရွေးပါ။ ဖျက်လိုက်သည်နှင့် ၎င်းတို့ကို ပြန်ဆည်ယူ၍ မရတော့ပါ။"</string>
     <string name="dvr_series_deletion_no_recordings" msgid="481210819034514">"ဖျက်ရန် ရုပ်သံဖမ်းယူမှုများ မရှိတော့ပါ။"</string>
@@ -246,17 +251,16 @@
     <string name="dvr_series_settings_priority" msgid="5836437092774185710">"ဦးစားပေးမှု"</string>
     <string name="dvr_series_settings_priority_highest" msgid="1072006447796648382">"အမြင့်ဆုံး"</string>
     <string name="dvr_series_settings_priority_lowest" msgid="6003996497908810225">"အနိမ့်ဆုံး"</string>
+    <string name="dvr_series_settings_priority_rank" msgid="667778382820956116">"နံပါတ် <xliff:g id="RANK">%1$d</xliff:g>"</string>
     <string name="dvr_series_settings_channels" msgid="3164900110165729909">"ချန်နယ်များ"</string>
     <string name="dvr_series_settings_channels_all" msgid="656434955168572976">"မည်သည့်အရာမဆို"</string>
     <string name="dvr_priority_title" msgid="1537886929061487213">"ဦးစားပေးမှုကို ရွေးရန်"</string>
-    <string name="dvr_priority_description" msgid="3653317573461947180">"တစ်ချိန်တည်းတွင် အစီအစဉ်များကို ဖမ်းယူရန် လိုင်းဖမ်းစက် မလောက်ငှသည့်အခါ ဦးစားပေးမှု ပိုမိုမြင့်မားသည့် အစီအစဉ်များကိုသာ ဖမ်းယူသွားပါမည်။"</string>
+    <string name="dvr_priority_description" msgid="8362040921417154645">"တစ်ချိန်တည်းတွင် ဖမ်းယူရမည့်အစီအစဉ် များပြားလွန်းသည့်အခါ ဦးစားပေးမှု ပိုမိုမြင့်မားသည့် အစီအစဉ်များကိုသာ ဖမ်းယူသွားပါမည်။"</string>
     <string name="dvr_priority_button_action_save" msgid="4773524273649733008">"သိမ်းရန်"</string>
     <string name="dvr_priority_action_one_time_recording" msgid="8174297042282719478">"တစ်ကြိမ်တစ်ခါတည်း ဖမ်းယူခြင်းသည် ဦးစားပေးမှုအမြင့်ဆုံးဖြစ်သည်"</string>
     <string name="dvr_action_cancel" msgid="8094060199570272625">"မလုပ်တော့"</string>
-    <!-- no translation found for dvr_action_error_cancel (6822474458738023531) -->
-    <skip />
-    <!-- no translation found for dvr_action_error_forget_storage (5869994565663655638) -->
-    <skip />
+    <string name="dvr_action_error_cancel" msgid="6822474458738023531">"မလုပ်တော့"</string>
+    <string name="dvr_action_error_forget_storage" msgid="5869994565663655638">"မေ့ပစ်ရန်"</string>
     <string name="dvr_action_stop" msgid="1378723485295471381">"ရပ်ရန်"</string>
     <string name="dvr_action_view_schedules" msgid="7442990695392774263">"ဖမ်းယူခြင်းအချိန်ဇယားကို ကြည့်ရန်"</string>
     <string name="dvr_action_record_episode" msgid="8596182676610326327">"ဤအစီအစဉ် တစ်ခုတည်း"</string>
@@ -270,17 +274,21 @@
     <string name="dvr_epg_program_recording_scheduled" msgid="1367741844291055016">"ရိုက်ကူးရေးအတွက် စီစဉ်ထားပါသည်"</string>
     <string name="dvr_epg_program_recording_conflict" msgid="4827911748865195373">"ရိုက်ကူးရေးအစီအစဉ်တိုက်နေပါသည်"</string>
     <string name="dvr_epg_program_recording_in_progress" msgid="2158340443975313745">"ဖမ်းယူနေသည်"</string>
+    <string name="dvr_epg_program_recording_failed" msgid="5589124519442328896">"ဖမ်းယူခြင်း မအောင်မြင်ပါ"</string>
     <string name="dvr_schedule_progress_message_reading_programs" msgid="6502513156469172313">"ရိုက်ကူးရေး အချိန်ဇယားများ သတ်မှတ်ရန် အစီအစဉ်များကို ဖတ်နေသည်"</string>
-    <!-- no translation found for dvr_error_missing_storage_title (691914341845362669) -->
+    <string name="dvr_series_schedules_progress_message_reading_programs" msgid="7221275889560136115">"ပရိုဂရမ်များကို ဖတ်နေသည်"</string>
+    <!-- no translation found for dvr_series_schedules_progress_message_updating_programs (6670286486601662465) -->
     <skip />
-    <!-- no translation found for dvr_error_missing_storage_description (1036680750969954236) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_title (4996547357826788002) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_description (3973761741009546142) -->
-    <skip />
+    <string name="dvr_error_small_sized_storage_title" msgid="5020225460011469011">"DVR သည် နောက်ထပ်သိုလှောင်ရန်နေရာလွတ် လိုအပ်နေသည်"</string>
+    <string name="dvr_error_small_sized_storage_description" msgid="8909789097974895119">"အစီအစဉ်များကို DVR နှင့် ဖမ်းယူသိမ်းဆည်းထားနိုင်ပါသည်။ သို့သော် DVR ကို အသုံးပြုနိုင်ရန် သင့်စက်ပစ္စည်းတွင် လုံလောက်သော နေရာလွတ် လောလောဆယ်မရှိပါ။ <xliff:g id="STORAGE_SIZE">%1$s</xliff:g>ဂစ်ဂါဘိုက် သို့မဟုတ် ၎င်းနှင့်အထက်ရှိသော ပြင်ပသိုလှောင်ကိရိယာနှင့် ချိတ်ဆက်ပြီး ၎င်းကို သိုလှောင်ခန်းစက်ပစ္စည်းအဖြစ် ပြင်ဆင်သတ်မှတ်ရန် ညွှန်ကြားချက်များအတိုင်း လိုက်နာပါ။"</string>
+    <string name="dvr_error_missing_storage_title" msgid="691914341845362669">"သိုလှောင်မှုများ ပျောက်ဆုံးနေခြင်း"</string>
+    <string name="dvr_error_missing_storage_description" msgid="1036680750969954236">"DVR က အသုံးပြုသော သိုလှောင်ခန်းအချို့မှာ ပျောက်ဆုံးနေသည်။ DVR ကို ပြန်ဖွင့်ရန်အတွက် ယခင်က အသုံးပြုခဲ့သော ပြင်ပသုံးအခွေဖွင့်စက်နှင့် ချိတ်ဆက်ပါ။ နောက်တစ်နည်းအနေဖြင့် ၎င်းကို အသုံးပြု၍ မရတော့လျှင် မေ့ပစ်ရန် ရွေးချယ်နိုင်ပါသည်။"</string>
+    <string name="dvr_error_forget_storage_title" msgid="4996547357826788002">"သိုလှောင်ခန်းကို မေ့ပစ်မလား။"</string>
+    <string name="dvr_error_forget_storage_description" msgid="3973761741009546142">"သင်မှတ်တမ်းတင်ထားသော အကြောင်းအရာနှင့် အချိန်ဇယားများအားလုံး ဆုံးရှုံးသွားလိမ့်မည်။"</string>
     <string name="dvr_stop_recording_dialog_title" msgid="2587018956502704278">"ရိုက်ကူးခြင်းကို ရပ်လိုပါသလား။"</string>
-    <string name="dvr_stop_recording_dialog_description" msgid="8059817161905528708">"ရိုက်ကူးထားသည့် အပိုင်းကို DVR စုစည်းမှုတွင် သိမ်းဆည်းသွားပါမည်။"</string>
+    <string name="dvr_stop_recording_dialog_description" msgid="4637830189399967761">"ဖမ်းယူထားသည့် အကြောင်းအရာကို သိမ်းဆည်းထားပါမည်။"</string>
+    <!-- no translation found for dvr_stop_recording_dialog_description_on_conflict (7876857267536083760) -->
+    <skip />
     <string name="dvr_program_conflict_dialog_title" msgid="109323740107060379">"ဖမ်းယူရန် စီစဉ်ထားသော်လည်း အချိန်ဇယားတိုက်နေပါသည်"</string>
     <string name="dvr_channel_conflict_dialog_title" msgid="7461033430572027786">"ဖမ်းယူမှုကို စတင်လိုက်ပါပြီ။ သို့သော် အချိန်ဇယားတိုက်နေပါသည်"</string>
     <string name="dvr_program_conflict_dialog_description_prefix" msgid="5520062013211648196">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> ကို ဖမ်းယူသွားပါမည်။"</string>
@@ -298,6 +306,14 @@
     <string name="dvr_already_scheduled_dialog_description" msgid="8170126125996414810">"တူညီသည့် ပရိုဂရမ်ကို <xliff:g id="PROGRAMSTARTTIME">%1$s</xliff:g> ၌ ဖမ်းယူရန် စီစဉ်ထားပြီး ဖြစ်ပါသည်။"</string>
     <string name="dvr_already_recorded_dialog_title" msgid="2760294707162057216">"ဖမ်းယူပြီးပါပြီ"</string>
     <string name="dvr_already_recorded_dialog_description" msgid="8966051583682746434">"ဤပရိုဂရမ်ကို ဖမ်းယူပြီးပါပြီ။ ၎င်းကို DVR စာကြည့်တိုက်တွင် ကြည့်ရှုနိုင်ပါသည်။"</string>
+    <!-- no translation found for dvr_series_recording_dialog_title (3521956660855853797) -->
+    <skip />
+    <!-- no translation found for dvr_series_recording_scheduled_no_conflict (2796926724821316879) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_this_series_conflict (2800805130979023066) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_one_conflict (3632394665556633158) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_conflict (2331412040101938479) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_one_conflict (5213169239215104024) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_conflict (5159645486201045330) -->
     <string name="dvr_program_not_found" msgid="3282879532038010202">"ရိုက်ကူးထားသည့်ပရိုဂရမ်ကို မတွေ့ပါ။"</string>
     <string name="dvr_playback_related_recordings" msgid="6978658039329924961">"ဆက်စပ်နေသည့် ရိုက်ကူးမှုများ"</string>
     <string name="dvr_msg_no_program_description" msgid="2521723281247322645">"(ပရိုဂရမ် ဖော်ပြချက်မရှိပါ)"</string>
@@ -310,15 +326,21 @@
     <string name="dvr_schedules_tuner_conflict_will_be_partially_recorded" msgid="5280490298546908729">"ချန်နယ်ချိန်ကိရိယာလိုင်းပူးနေ၍ တစ်ချို့ကိုသာ ဖမ်းယူနိုင်မည်။"</string>
     <string name="dvr_schedules_tuner_conflict_will_not_be_recorded_info" msgid="5065400564003201095">"ချန်နယ်ချိန်ကိရိယာ လိုင်းပူးနေ၍ ဖမ်းယူနိုင်မည်မဟုတ်ပါ။"</string>
     <string name="dvr_schedules_empty_state" msgid="1291529283469462741">"စီစဉ်ထားသည့် ဖမ်းယူမှုများ မရှိသေးပါ။\nဖမ်းယူမှုကို ပရိုဂရမ်လမ်းညွှန်အား ကြည့်ရှု၍ စီစဉ်နိုင်ပါသည်။"</string>
-    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="5687216771746946005">
-      <item quantity="other">နောက် %1$d ရက်အတွက် ဖမ်းယူခြင်းအချိန်ဇယား</item>
-      <item quantity="one">နောက် %1$d ရက်အတွက် ဖမ်းယူခြင်းအချိန်ဇယား</item>
+    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="9077188267856194114">
+      <item quantity="other">ရိုက်ကူးမှု %1$d ခု ပဋိပက္ခဖြစ်နေပါသည်</item>
+      <item quantity="one">ရိုက်ကူးမှု %1$d ခု ပဋိပက္ခဖြစ်နေပါသည်</item>
     </plurals>
-    <string name="dvr_series_schedules_settings" msgid="4069530935369561001">"ဆက်တင်များ"</string>
-    <string name="dvr_series_schedules_dialog_back" msgid="1594678171444843646">"နောက်သို့"</string>
-    <string name="dvr_series_schedules_undo" msgid="7445942340901896865">"တစ်ဆင့် နောက်ပြန်ရန်"</string>
+    <string name="dvr_series_schedules_settings" msgid="4868501926847903985">"ဇာတ်လမ်းတွဲဆက်တင်များ"</string>
+    <string name="dvr_series_schedules_start" msgid="8458768834047133835">"ဇာတ်လမ်းတွဲ စတင်ဖမ်းယူရန်"</string>
+    <string name="dvr_series_schedules_stop" msgid="3427479298317584961">"ဇာတ်လမ်းတွဲဖမ်းယူခြင်း ရပ်ရန်"</string>
+    <string name="dvr_series_schedules_stop_dialog_title" msgid="4975886236535334420">"ဇာတ်လမ်းတွဲဖမ်းယူခြင်းကို ရပ်မလား။"</string>
+    <string name="dvr_series_schedules_stop_dialog_description" msgid="7547266283366940085">"ဖမ်းယူထားသည့် အပိုင်းများသည် DVR စာကြည့်တိုက်တွင် ရှိနေဦးမည်ဖြစ်သည်။"</string>
+    <string name="dvr_series_schedules_stop_dialog_action_stop" msgid="2351839914865142478">"ရပ်ရန်"</string>
     <string name="dvr_series_schedules_empty_state" msgid="3407962945399698707">"အပိုင်းငယ်များ မရနိုင်သေးပါ။\nရနိုင်သည်နှင့် ၎င်းတို့ကို ဖမ်းယူသွားပါမည်။"</string>
-    <!-- no translation found for dvr_schedules_recording_duration (3701771573063918552) -->
+    <plurals name="dvr_schedules_recording_duration" formatted="false" msgid="3701771573063918552">
+      <item quantity="other">(%1$d မိနစ်)</item>
+      <item quantity="one">(%1$d မိနစ်) </item>
+    </plurals>
     <string name="dvr_date_today" msgid="7691050705354303471">"ဒီနေ့"</string>
     <string name="dvr_date_tomorrow" msgid="4136735681186981844">"မနက်ဖြန်"</string>
     <string name="dvr_date_yesterday" msgid="2127672919053118239">"မနေ့က"</string>

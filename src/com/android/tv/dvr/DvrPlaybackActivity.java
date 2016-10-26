@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.util.Log;
 
 import com.android.tv.R;
+import com.android.tv.TvApplication;
 import com.android.tv.dvr.ui.DvrPlaybackOverlayFragment;
 
 /**
@@ -36,6 +37,7 @@ public class DvrPlaybackActivity extends Activity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        TvApplication.setCurrentRunningProcess(this, true);
         if (DEBUG) Log.d(TAG, "onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dvr_playback);

@@ -25,6 +25,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -35,36 +36,6 @@ import java.util.Locale;
 public class LocationUtils {
     private static final String TAG = "LocationUtils";
     private static final boolean DEBUG = false;
-
-    private static final LocationListener LOCATION_LISTENER = new LocationListener() {
-        @Override
-        public void onLocationChanged(Location location) {
-            Geocoder geocoder = new Geocoder(sApplicationContext, Locale.getDefault());
-            try {
-                List<Address> addresses = geocoder.getFromLocation(location.getLatitude(),
-                        location.getLongitude(), 1);
-                if (addresses != null) {
-                    sAddress = addresses.get(0);
-                    if (DEBUG) Log.d(TAG, "returned address: " + sAddress);
-                } else {
-                    if (DEBUG) Log.d(TAG, "No address returned");
-                }
-                sError = null;
-            } catch (IOException e) {
-                Log.w(TAG, "Error in retrieving address", e);
-                sError = e;
-            }
-        }
-
-        @Override
-        public void onStatusChanged(String provider, int status, Bundle extras) { }
-
-        @Override
-        public void onProviderEnabled(String provider) { }
-
-        @Override
-        public void onProviderDisabled(String provider) { }
-    };
 
     private static Context sApplicationContext;
     private static Address sAddress;
@@ -83,19 +54,67 @@ public class LocationUtils {
         }
         if (sApplicationContext == null) {
             sApplicationContext = context.getApplicationContext();
-            LocationManager mLocationManager = (LocationManager) context.getSystemService(
-                    Context.LOCATION_SERVICE);
-            try {
-                mLocationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 10,
-                        LOCATION_LISTENER, null);
-            } catch (SecurityException e) {
-                // Enables requesting the location updates again.
-                sApplicationContext = null;
-                throw e;
-            }
         }
+        LocationUtilsHelper.startLocationUpdates();
         return null;
     }
 
+    private static void updateAddress(Location location) {
+        if (DEBUG) Log.d(TAG, "Updating address with " + location);
+        if (location == null) {
+            return;
+        }
+        Geocoder geocoder = new Geocoder(sApplicationContext, Locale.getDefault());
+        try {
+            List<Address> addresses = geocoder.getFromLocation(
+                    location.getLatitude(), location.getLongitude(), 1);
+            if (addresses != null) {
+                sAddress = addresses.get(0);
+                if (DEBUG) Log.d(TAG, "Got " + sAddress);
+            } else {
+                if (DEBUG) Log.d(TAG, "No address returned");
+            }
+            sError = null;
+        } catch (IOException e) {
+            Log.w(TAG, "Error in updating address", e);
+            sError = e;
+        }
+    }
+
     private LocationUtils() { }
+
+    private static class LocationUtilsHelper {
+        private static final LocationListener LOCATION_LISTENER = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location location) {
+                updateAddress(location);
+            }
+
+            @Override
+            public void onStatusChanged(String provider, int status, Bundle extras) { }
+
+            @Override
+            public void onProviderEnabled(String provider) { }
+
+            @Override
+            public void onProviderDisabled(String provider) { }
+        };
+
+        private static LocationManager sLocationManager;
+
+        public static void startLocationUpdates() {
+            if (sLocationManager == null) {
+                sLocationManager = (LocationManager) sApplicationContext.getSystemService(
+                        Context.LOCATION_SERVICE);
+                try {
+                    sLocationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER, 1000, 10, LOCATION_LISTENER, null);
+                } catch (SecurityException e) {
+                    // Enables requesting the location updates again.
+                    sLocationManager = null;
+                    throw e;
+                }
+            }
+        }
+    }
 }

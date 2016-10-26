@@ -141,6 +141,8 @@ public class ChannelsRowAdapter extends ItemListRowView.ItemListAdapter<Channel>
             viewHolder.itemView.setOnClickListener(mAppLinkOnClickListener);
         } else if (viewType == R.layout.menu_card_dvr) {
             viewHolder.itemView.setOnClickListener(mDvrOnClickListener);
+            SimpleCardView view = (SimpleCardView) viewHolder.itemView;
+            view.setText(R.string.channels_item_dvr);
         } else {
             viewHolder.itemView.setTag(getItemList().get(position));
             viewHolder.itemView.setOnClickListener(mChannelOnClickListener);
@@ -163,10 +165,7 @@ public class ChannelsRowAdapter extends ItemListRowView.ItemListAdapter<Channel>
                 // Sometimes applicationInfo can be null. b/28932537
                 && inputManager.getTvInputAppInfo(currentChannel.getInputId()) != null;
         boolean showDvrCard = false;
-        if (mDvrDataManager != null && !(mDvrDataManager.getRecordedPrograms().isEmpty()
-                && mDvrDataManager.getStartedRecordings().isEmpty()
-                && mDvrDataManager.getNonStartedScheduledRecordings().isEmpty()
-                && mDvrDataManager.getSeriesRecordings().isEmpty())) {
+        if (mDvrDataManager != null) {
             for (TvInputInfo info : inputManager.getTvInputInfos(true, true)) {
                 if (info.canRecord()) {
                     showDvrCard = true;

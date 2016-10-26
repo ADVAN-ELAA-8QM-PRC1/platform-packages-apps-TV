@@ -17,29 +17,36 @@
 package com.android.tv.dvr;
 
 import android.annotation.TargetApi;
+import android.content.ContentProviderOperation;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
+import android.content.OperationApplicationException;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Handler;
+import android.os.RemoteException;
 import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
 import android.support.annotation.WorkerThread;
 import android.util.Log;
+import android.util.Range;
 
 import com.android.tv.ApplicationSingletons;
 import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.data.Channel;
-import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.Program;
-import com.android.tv.dvr.SeriesRecordingScheduler.ProgramLoadCallback;
+import com.android.tv.dvr.DvrDataManager.OnRecordedProgramLoadFinishedListener;
+import com.android.tv.dvr.DvrDataManager.RecordedProgramListener;
+import com.android.tv.dvr.DvrScheduleManager.OnInitializeListener;
+import com.android.tv.dvr.SeriesRecording.SeriesState;
 import com.android.tv.util.AsyncDbTask;
 import com.android.tv.util.Utils;
 
@@ -63,7 +70,6 @@ public class DvrManager {
     private static final boolean DEBUG = false;
 
     private final WritableDvrDataManager mDataManager;
-    private final ChannelDataManager mChannelDataManager;
     private final DvrScheduleManager mScheduleManager;
     // @GuardedBy("mListener")
     private final Map<Listener, Handler> mListener = new HashMap<>();
@@ -71,64 +77,124 @@ public class DvrManager {
 
     public DvrManager(Context context) {
         SoftPreconditions.checkFeatureEnabled(context, CommonFeatures.DVR, TAG);
+        mAppContext = context.getApplicationContext();
         ApplicationSingletons appSingletons = TvApplication.getSingletons(context);
         mDataManager = (WritableDvrDataManager) appSingletons.getDvrDataManager();
-        mAppContext = context.getApplicationContext();
-        mChannelDataManager = appSingletons.getChannelDataManager();
         mScheduleManager = appSingletons.getDvrScheduleManager();
+        if (mDataManager.isInitialized() && mScheduleManager.isInitialized()) {
+            createSeriesRecordingsForRecordedProgramsIfNeeded(mDataManager.getRecordedPrograms());
+        } else {
+            // No need to handle DVR schedule load finished because schedule manager is initialized
+            // after the all the schedules are loaded.
+            if (!mDataManager.isRecordedProgramLoadFinished()) {
+                mDataManager.addRecordedProgramLoadFinishedListener(
+                        new OnRecordedProgramLoadFinishedListener() {
+                            @Override
+                            public void onRecordedProgramLoadFinished() {
+                                mDataManager.removeRecordedProgramLoadFinishedListener(this);
+                                if (mDataManager.isInitialized()
+                                        && mScheduleManager.isInitialized()) {
+                                    createSeriesRecordingsForRecordedProgramsIfNeeded(
+                                            mDataManager.getRecordedPrograms());
+                                }
+                            }
+                        });
+            }
+            if (!mScheduleManager.isInitialized()) {
+                mScheduleManager.addOnInitializeListener(new OnInitializeListener() {
+                    @Override
+                    public void onInitialize() {
+                        mScheduleManager.removeOnInitializeListener(this);
+                        if (mDataManager.isInitialized() && mScheduleManager.isInitialized()) {
+                            createSeriesRecordingsForRecordedProgramsIfNeeded(
+                                    mDataManager.getRecordedPrograms());
+                        }
+                    }
+                });
+            }
+        }
+        mDataManager.addRecordedProgramListener(new RecordedProgramListener() {
+            @Override
+            public void onRecordedProgramsAdded(RecordedProgram... recordedPrograms) {
+                if (!mDataManager.isInitialized() || !mScheduleManager.isInitialized()) {
+                    return;
+                }
+                for (RecordedProgram recordedProgram : recordedPrograms) {
+                    createSeriesRecordingForRecordedProgramIfNeeded(recordedProgram);
+                }
+            }
+
+            @Override
+            public void onRecordedProgramsChanged(RecordedProgram... recordedPrograms) { }
+
+            @Override
+            public void onRecordedProgramsRemoved(RecordedProgram... recordedPrograms) {
+                // Removing series recording is handled in the SeriesRecordingDetailsFragment.
+            }
+        });
+    }
+
+    private void createSeriesRecordingsForRecordedProgramsIfNeeded(
+            List<RecordedProgram> recordedPrograms) {
+        for (RecordedProgram recordedProgram : recordedPrograms) {
+            createSeriesRecordingForRecordedProgramIfNeeded(recordedProgram);
+        }
+    }
+
+    private void createSeriesRecordingForRecordedProgramIfNeeded(RecordedProgram recordedProgram) {
+        if (recordedProgram.getSeriesId() != null) {
+            SeriesRecording seriesRecording =
+                    mDataManager.getSeriesRecording(recordedProgram.getSeriesId());
+            if (seriesRecording == null) {
+                addSeriesRecording(recordedProgram);
+            }
+        }
     }
 
     /**
      * Schedules a recording for {@code program}.
      */
-    public void addSchedule(Program program) {
+    public ScheduledRecording addSchedule(Program program) {
         if (!SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
-            return;
+            return null;
         }
-        TvInputInfo input = Utils.getTvInputInfoForProgram(mAppContext, program);
-        if (input == null) {
-            Log.e(TAG, "Can't find input for program: " + program);
-            return;
-        }
-        ScheduledRecording schedule;
         SeriesRecording seriesRecording = getSeriesRecording(program);
-        if (seriesRecording == null) {
-            schedule = createScheduledRecordingBuilder(input.getId(), program)
-                    .setPriority(mScheduleManager.suggestNewPriority())
-                    .build();
-        } else {
-            schedule = createScheduledRecordingBuilder(input.getId(), program)
-                    .setPriority(seriesRecording.getPriority())
-                    .setSeriesRecordingId(seriesRecording.getId())
-                    .build();
-        }
-        mDataManager.addScheduledRecording(schedule);
+        return addSchedule(program, seriesRecording == null
+                ? mScheduleManager.suggestNewPriority()
+                : seriesRecording.getPriority());
     }
 
     /**
-     * Schedules a recording for {@code program} instead of the list of recording that conflict.
-     *
-     * @param program the program to record
-     * @param recordingsToOverride the possible empty list of recordings that will not be recorded
+     * Schedules a recording for {@code program} with the highest priority so that the schedule
+     * can be recorded.
      */
-    public void addSchedule(Program program, List<ScheduledRecording> recordingsToOverride) {
-        Log.i(TAG, "Adding scheduled recording of " + program + " instead of " +
-                recordingsToOverride);
+    public ScheduledRecording addScheduleWithHighestPriority(Program program) {
         if (!SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
-            return;
+            return null;
         }
+        SeriesRecording seriesRecording = getSeriesRecording(program);
+        return addSchedule(program, seriesRecording == null
+                ? mScheduleManager.suggestNewPriority()
+                : mScheduleManager.suggestHighestPriority(seriesRecording.getInputId(),
+                        new Range(program.getStartTimeUtcMillis(), program.getEndTimeUtcMillis()),
+                        seriesRecording.getPriority()));
+    }
+
+    private ScheduledRecording addSchedule(Program program, long priority) {
         TvInputInfo input = Utils.getTvInputInfoForProgram(mAppContext, program);
         if (input == null) {
             Log.e(TAG, "Can't find input for program: " + program);
-            return;
+            return null;
         }
-        Collections.sort(recordingsToOverride, ScheduledRecording.PRIORITY_COMPARATOR);
-        long priority = recordingsToOverride.isEmpty() ? Long.MAX_VALUE
-                : recordingsToOverride.get(0).getPriority() + 1;
-        ScheduledRecording r = createScheduledRecordingBuilder(input.getId(), program)
+        ScheduledRecording schedule;
+        SeriesRecording seriesRecording = getSeriesRecording(program);
+        schedule = createScheduledRecordingBuilder(input.getId(), program)
                 .setPriority(priority)
+                .setSeriesRecordingId(seriesRecording == null ? SeriesRecording.ID_NOT_SET
+                        : seriesRecording.getId())
                 .build();
-        mDataManager.addScheduledRecording(r);
+        mDataManager.addScheduledRecording(schedule);
+        return schedule;
     }
 
     /**
@@ -148,6 +214,15 @@ public class DvrManager {
         addScheduleInternal(input.getId(), channel.getId(), startTime, endTime);
     }
 
+    /**
+     * Adds the schedule.
+     */
+    public void addSchedule(ScheduledRecording schedule) {
+        if (mDataManager.isDvrScheduleLoadFinished()) {
+            mDataManager.addScheduledRecording(schedule);
+        }
+    }
+
     private void addScheduleInternal(String inputId, long channelId, long startTime, long endTime) {
         mDataManager.addScheduledRecording(ScheduledRecording
                 .builder(inputId, channelId, startTime, endTime)
@@ -156,10 +231,10 @@ public class DvrManager {
     }
 
     /**
-     * Adds a new series recording and schedules for the programs.
+     * Adds a new series recording and schedules for the programs with the initial state.
      */
     public SeriesRecording addSeriesRecording(Program selectedProgram,
-            List<Program> programsToSchedule) {
+            List<Program> programsToSchedule, @SeriesState int initialState) {
         Log.i(TAG, "Adding series recording for program " + selectedProgram + ", and schedules: "
                 + programsToSchedule);
         if (!SoftPreconditions.checkState(mDataManager.isInitialized())) {
@@ -172,6 +247,7 @@ public class DvrManager {
         }
         SeriesRecording seriesRecording = SeriesRecording.builder(input.getId(), selectedProgram)
                 .setPriority(mScheduleManager.suggestNewSeriesPriority())
+                .setState(initialState)
                 .build();
         mDataManager.addSeriesRecording(seriesRecording);
         // The schedules for the recorded programs should be added not to create the schedule the
@@ -179,6 +255,18 @@ public class DvrManager {
         addRecordedProgramToSeriesRecording(seriesRecording);
         addScheduleToSeriesRecording(seriesRecording, programsToSchedule);
         return seriesRecording;
+    }
+
+    private void addSeriesRecording(RecordedProgram recordedProgram) {
+        SeriesRecording seriesRecording =
+                SeriesRecording.builder(recordedProgram.getInputId(), recordedProgram)
+                        .setPriority(mScheduleManager.suggestNewSeriesPriority())
+                        .setState(SeriesRecording.STATE_SERIES_STOPPED)
+                        .build();
+        mDataManager.addSeriesRecording(seriesRecording);
+        // The schedules for the recorded programs should be added not to create the schedule the
+        // duplicate episodes.
+        addRecordedProgramToSeriesRecording(seriesRecording);
     }
 
     private void addRecordedProgramToSeriesRecording(SeriesRecording series) {
@@ -221,11 +309,8 @@ public class DvrManager {
                     mDataManager.getScheduledRecordingForProgramId(program.getId());
             if (scheduleWithSameProgram != null) {
                 if (scheduleWithSameProgram.getState()
-                        == ScheduledRecording.STATE_RECORDING_NOT_STARTED
-                        || scheduleWithSameProgram.getState()
-                        == ScheduledRecording.STATE_RECORDING_CANCELED) {
+                        == ScheduledRecording.STATE_RECORDING_NOT_STARTED) {
                     ScheduledRecording r = ScheduledRecording.buildFrom(scheduleWithSameProgram)
-                            .setPriority(series.getPriority())
                             .setSeriesRecordingId(series.getId())
                             .build();
                     if (!r.equals(scheduleWithSameProgram)) {
@@ -233,15 +318,10 @@ public class DvrManager {
                     }
                 }
             } else {
-                ScheduledRecording.Builder scheduledRecordingBuilder =
-                        createScheduledRecordingBuilder(input.getId(), program)
+                toAdd.add(createScheduledRecordingBuilder(input.getId(), program)
                         .setPriority(series.getPriority())
-                        .setSeriesRecordingId(series.getId());
-                if (series.getState() == SeriesRecording.STATE_SERIES_CANCELED) {
-                    scheduledRecordingBuilder.setState(
-                            ScheduledRecording.STATE_RECORDING_CANCELED);
-                }
-                toAdd.add(scheduledRecordingBuilder.build());
+                        .setSeriesRecordingId(series.getId())
+                        .build());
             }
         }
         if (!toAdd.isEmpty()) {
@@ -257,29 +337,33 @@ public class DvrManager {
      */
     public void updateSeriesRecording(SeriesRecording series) {
         if (SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
-            // TODO: revise this method. b/30946239
-            boolean isPreviousCanceled = false;
-            long oldPriority = 0;
+            SeriesRecordingScheduler scheduler = SeriesRecordingScheduler.getInstance(mAppContext);
+            scheduler.pauseUpdate();
             SeriesRecording previousSeries = mDataManager.getSeriesRecording(series.getId());
             if (previousSeries != null) {
-                isPreviousCanceled = previousSeries.getState()
-                        == SeriesRecording.STATE_SERIES_CANCELED;
-                oldPriority = previousSeries.getPriority();
+                if (previousSeries.getChannelOption() != series.getChannelOption()
+                        || (previousSeries.getChannelOption() == SeriesRecording.OPTION_CHANNEL_ONE
+                        && previousSeries.getChannelId() != series.getChannelId())) {
+                    List<ScheduledRecording> schedules =
+                            mDataManager.getScheduledRecordings(series.getId());
+                    List<ScheduledRecording> schedulesToRemove = new ArrayList<>();
+                    for (ScheduledRecording schedule : schedules) {
+                        if (schedule.isNotStarted()) {
+                            schedulesToRemove.add(schedule);
+                        }
+                    }
+                    mDataManager.removeScheduledRecording(true,
+                            ScheduledRecording.toArray(schedulesToRemove));
+                }
             }
             mDataManager.updateSeriesRecording(series);
-            if (!isPreviousCanceled && series.getState() == SeriesRecording.STATE_SERIES_CANCELED) {
-                cancelScheduleToSeriesRecording(series);
-            } else if (isPreviousCanceled
-                    && series.getState() == SeriesRecording.STATE_SERIES_NORMAL) {
-                resumeScheduleToSeriesRecording(series);
-            }
-            if (oldPriority != series.getPriority()) {
+            if (previousSeries == null
+                    || previousSeries.getPriority() != series.getPriority()) {
                 long priority = series.getPriority();
                 List<ScheduledRecording> schedulesToUpdate = new ArrayList<>();
                 for (ScheduledRecording schedule
                         : mDataManager.getScheduledRecordings(series.getId())) {
-                    if (schedule.getState() != ScheduledRecording.STATE_RECORDING_IN_PROGRESS
-                            && schedule.getStartTimeMs() > System.currentTimeMillis()) {
+                    if (schedule.isNotStarted()) {
                         schedulesToUpdate.add(ScheduledRecording.buildFrom(schedule)
                                 .setPriority(priority).build());
                     }
@@ -289,57 +373,8 @@ public class DvrManager {
                             ScheduledRecording.toArray(schedulesToUpdate));
                 }
             }
+            scheduler.resumeUpdate();
         }
-    }
-
-    private void cancelScheduleToSeriesRecording(SeriesRecording series) {
-        List<ScheduledRecording> allRecordings = mDataManager.getAvailableScheduledRecordings();
-        for (ScheduledRecording recording : allRecordings) {
-            if (recording.getSeriesRecordingId() == series.getId()) {
-                if (recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                    stopRecording(recording);
-                    continue;
-                }
-                updateScheduledRecording(ScheduledRecording.buildFrom(recording).setState
-                        (ScheduledRecording.STATE_RECORDING_CANCELED).build());
-            }
-        }
-    }
-
-    private void resumeScheduleToSeriesRecording(SeriesRecording series) {
-        List<ScheduledRecording> allRecording = mDataManager
-                .getAvailableAndCanceledScheduledRecordings();
-        for (ScheduledRecording recording : allRecording) {
-            if (recording.getSeriesRecordingId() == series.getId()) {
-                if (recording.getState() == ScheduledRecording.STATE_RECORDING_CANCELED &&
-                        recording.getEndTimeMs() > System.currentTimeMillis()) {
-                    updateScheduledRecording(ScheduledRecording.buildFrom(recording)
-                            .setState(ScheduledRecording.STATE_RECORDING_NOT_STARTED).build());
-                }
-            }
-        }
-    }
-
-    /**
-     * Queries the programs which belong to the same series as {@code seriesProgram}.
-     * <p>
-     * It's done in the background because it needs the DB access, and the callback will be called
-     * when it finishes.
-     */
-    public void queryProgramsForSeries(Program seriesProgram, ProgramLoadCallback callback) {
-        if (!SoftPreconditions.checkState(mDataManager.isInitialized())) {
-            callback.onProgramLoadFinished(Collections.emptyList());
-            return;
-        }
-        TvInputInfo input = Utils.getTvInputInfoForProgram(mAppContext, seriesProgram);
-        if (input == null) {
-            Log.e(TAG, "Can't find input for program: " + seriesProgram);
-            return;
-        }
-        SeriesRecordingScheduler.getInstance(mAppContext).queryPrograms(
-                SeriesRecording.builder(input.getId(), seriesProgram)
-                        .setPriority(mScheduleManager.suggestNewPriority())
-                        .build(), callback);
     }
 
     /**
@@ -362,6 +397,33 @@ public class DvrManager {
             }
         }
         mDataManager.removeSeriesRecording(series);
+    }
+
+    /**
+     * Returns true, if the series recording can be removed. If a series recording is NORMAL state
+     * or has recordings or schedules, it cannot be removed.
+     */
+    public boolean canRemoveSeriesRecording(long seriesRecordingId) {
+        SeriesRecording seriesRecording = mDataManager.getSeriesRecording(seriesRecordingId);
+        if (seriesRecording == null) {
+            return false;
+        }
+        if (!seriesRecording.isStopped()) {
+            return false;
+        }
+        for (ScheduledRecording r : mDataManager.getAvailableScheduledRecordings()) {
+            if (r.getSeriesRecordingId() == seriesRecordingId) {
+                return false;
+            }
+        }
+        String seriesId = seriesRecording.getSeriesId();
+        SoftPreconditions.checkNotNull(seriesId);
+        for (RecordedProgram r : mDataManager.getRecordedPrograms()) {
+            if (seriesId.equals(r.getSeriesId())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -401,6 +463,23 @@ public class DvrManager {
     }
 
     /**
+     * Removes scheduled recordings without changing to the DELETED state.
+     */
+    public void forceRemoveScheduledRecording(ScheduledRecording... schedules) {
+        Log.i(TAG, "Force removing " + Arrays.asList(schedules));
+        if (!SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
+            return;
+        }
+        for (ScheduledRecording r : schedules) {
+            if (r.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
+                stopRecording(r);
+            } else {
+                mDataManager.removeScheduledRecording(true, r);
+            }
+        }
+    }
+
+    /**
      * Removes the recorded program. It deletes the file if possible.
      */
     public void removeRecordedProgram(Uri recordedProgramUri) {
@@ -434,51 +513,51 @@ public class DvrManager {
             @Override
             protected Void doInBackground(Void... params) {
                 ContentResolver resolver = mAppContext.getContentResolver();
-                resolver.delete(recordedProgram.getUri(), null, null);
-                try {
-                    Uri dataUri = recordedProgram.getDataUri();
-                    if (dataUri != null && ContentResolver.SCHEME_FILE.equals(dataUri.getScheme())
-                            && dataUri.getPath() != null) {
-                        File recordedProgramPath = new File(dataUri.getPath());
-                        if (!recordedProgramPath.exists()) {
-                            if (DEBUG) Log.d(TAG, "File to delete not exist: "
-                                    + recordedProgramPath);
-                        } else {
-                            Utils.deleteDirOrFile(recordedProgramPath);
-                            if (DEBUG) {
-                                Log.d(TAG, "Sucessfully deleted files of the recorded program: "
-                                        + recordedProgram.getDataUri());
-                            }
+                int deletedCounts = resolver.delete(recordedProgram.getUri(), null, null);
+                if (deletedCounts > 0) {
+                    // TODO: executeOnExecutor should be called on the main thread.
+                    new AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... params) {
+                            removeRecordedData(recordedProgram.getDataUri());
+                            return null;
                         }
-                    }
-                } catch (SecurityException e) {
-                    if (DEBUG) {
-                        Log.d(TAG, "To delete " + recordedProgram
-                                + "\nyou should manually delete video data at"
-                                + "\nadb shell rm -rf " + recordedProgram.getDataUri());
-                    }
+                    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
                 }
                 return null;
             }
         }.executeOnDbThread();
     }
 
-    /**
-     * Remove all recorded programs due to missing storage.
-     *
-     * @param inputId for the recorded programs to remove
-     */
-    public void removeRecordedProgramByMissingStorage(final String inputId) {
-        if (!SoftPreconditions.checkState(mDataManager.isInitialized())) {
-            return;
+    public void removeRecordedPrograms(List<Long> recordedProgramIds) {
+        final ArrayList<ContentProviderOperation> dbOperations = new ArrayList<>();
+        final List<Uri> dataUris = new ArrayList<>();
+        for (Long rId : recordedProgramIds) {
+            RecordedProgram r = mDataManager.getRecordedProgram(rId);
+            if (r != null) {
+                dataUris.add(r.getDataUri());
+                dbOperations.add(ContentProviderOperation.newDelete(r.getUri()).build());
+            }
         }
         new AsyncDbTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... params) {
                 ContentResolver resolver = mAppContext.getContentResolver();
-                String args[] = { inputId };
-                resolver.delete(TvContract.RecordedPrograms.CONTENT_URI,
-                        TvContract.RecordedPrograms.COLUMN_INPUT_ID + " = ?", args);
+                try {
+                    resolver.applyBatch(TvContract.AUTHORITY, dbOperations);
+                    // TODO: executeOnExecutor should be called on the main thread.
+                    new AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... params) {
+                            for (Uri dataUri : dataUris) {
+                                removeRecordedData(dataUri);
+                            }
+                            return null;
+                        }
+                    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+                } catch (RemoteException | OperationApplicationException e) {
+                    Log.w(TAG, "Remove reocrded programs from DB failed.", e);
+                }
                 return null;
             }
         }.executeOnDbThread();
@@ -527,10 +606,9 @@ public class DvrManager {
      * {@code false}.
      */
     public boolean isConflicting(ScheduledRecording schedule) {
-        if (!SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
-            return false;
-        }
-        return mScheduleManager.isConflicting(schedule);
+        return schedule != null
+                && SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())
+                && mScheduleManager.isConflicting(schedule);
     }
 
     /**
@@ -547,20 +625,26 @@ public class DvrManager {
     }
 
     /**
-     * Returns the earliest end time of the current recording for the TV input. If there are no
-     * recordings, Long.MAX_VALUE is returned.
+     * Sets the highest priority to the schedule.
      */
-    public long getEarliestRecordingEndTime(String inputId) {
-        long result = Long.MAX_VALUE;
-        for (ScheduledRecording schedule : mDataManager.getStartedRecordings()) {
-            TvInputInfo input = Utils.getTvInputInfoForChannelId(mAppContext,
-                    schedule.getChannelId());
-            if (input != null && input.getId().equals(inputId)
-                    && schedule.getEndTimeMs() < result) {
-                result = schedule.getEndTimeMs();
+    public void setHighestPriority(ScheduledRecording schedule) {
+        if (SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
+            long newPriority = mScheduleManager.suggestHighestPriority(schedule);
+            if (newPriority != schedule.getPriority()) {
+                mDataManager.updateScheduledRecording(ScheduledRecording.buildFrom(schedule)
+                        .setPriority(newPriority).build());
             }
         }
-        return result;
+    }
+
+    /**
+     * Suggests the higher priority than the schedules which overlap with {@code schedule}.
+     */
+    public long suggestHighestPriority(ScheduledRecording schedule) {
+        if (SoftPreconditions.checkState(mDataManager.isDvrScheduleLoadFinished())) {
+            return mScheduleManager.suggestHighestPriority(schedule);
+        }
+        return DvrScheduleManager.DEFAULT_PRIORITY;
     }
 
     /**
@@ -619,6 +703,23 @@ public class DvrManager {
             }
         }
         return null;
+    }
+
+    /**
+     * Returns schedules which is available (i.e., isNotStarted or isInProgress) and belongs to
+     * the series recording {@code seriesRecordingId}.
+     */
+    public List<ScheduledRecording> getAvailableScheduledRecording(long seriesRecordingId) {
+        if (!mDataManager.isDvrScheduleLoadFinished()) {
+            return Collections.emptyList();
+        }
+        List<ScheduledRecording> schedules = new ArrayList<>();
+        for (ScheduledRecording schedule : mDataManager.getScheduledRecordings(seriesRecordingId)) {
+            if (schedule.isInProgress() || schedule.isNotStarted()) {
+                schedules.add(schedule);
+            }
+        }
+        return schedules;
     }
 
     /**
@@ -702,6 +803,40 @@ public class DvrManager {
             }
         }
         return null;
+    }
+
+    @WorkerThread
+    private void removeRecordedData(Uri dataUri) {
+        try {
+            if (dataUri != null && ContentResolver.SCHEME_FILE.equals(dataUri.getScheme())
+                    && dataUri.getPath() != null) {
+                File recordedProgramPath = new File(dataUri.getPath());
+                if (!recordedProgramPath.exists()) {
+                    if (DEBUG) Log.d(TAG, "File to delete not exist: " + recordedProgramPath);
+                } else {
+                    Utils.deleteDirOrFile(recordedProgramPath);
+                    if (DEBUG) {
+                        Log.d(TAG, "Sucessfully deleted files of the recorded program: " + dataUri);
+                    }
+                }
+            }
+        } catch (SecurityException e) {
+            if (DEBUG) {
+                Log.d(TAG, "To delete this recorded program, please manually delete video data at"
+                        + "\nadb shell rm -rf " + dataUri);
+            }
+        }
+    }
+
+    /**
+     * Remove all the records related to the input.
+     * <p>
+     * Note that this should be called after the input was removed.
+     */
+    public void forgetStorage(String inputId) {
+        if (mDataManager.isInitialized()) {
+            mDataManager.forgetStorage(inputId);
+        }
     }
 
     /**

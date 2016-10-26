@@ -20,16 +20,7 @@ import android.content.Context;
 import android.support.annotation.Nullable;
 
 import com.android.tv.ChannelTuner;
-import com.android.tv.TvApplication;
-import com.android.tv.common.feature.CommonFeatures;
-import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.data.Channel;
-import com.android.tv.dvr.DvrDataManager;
-import com.android.tv.dvr.DvrDataManager.OnDvrScheduleLoadFinishedListener;
-import com.android.tv.dvr.DvrDataManager.OnRecordedProgramLoadFinishedListener;
-import com.android.tv.dvr.DvrDataManager.RecordedProgramListener;
-import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
-import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.ui.TunableTvView;
 import com.android.tv.ui.TunableTvView.OnScreenBlockingChangedListener;
 
@@ -43,71 +34,7 @@ public class MenuUpdater {
     @Nullable
     private final TunableTvView mTvView;
     private final Menu mMenu;
-    @Nullable
-    private final DvrDataManager mDvrDataManager;
     private ChannelTuner mChannelTuner;
-
-    private final OnScreenBlockingChangedListener mOnScreenBlockingChangeListener =
-            new OnScreenBlockingChangedListener() {
-                @Override
-                public void onScreenBlockingChanged(boolean blocked) {
-                    mMenu.update(PlayControlsRow.ID);
-                }
-            };
-    private final OnRecordedProgramLoadFinishedListener mRecordedProgramLoadedListener =
-            new OnRecordedProgramLoadFinishedListener() {
-                @Override
-                public void onRecordedProgramLoadFinished() {
-                    mMenu.update(ChannelsRow.ID);
-                }
-            };
-    private final RecordedProgramListener mRecordedProgramListener =
-            new RecordedProgramListener() {
-                @Override
-                public void onRecordedProgramAdded(RecordedProgram recordedProgram) {
-                    mMenu.update(ChannelsRow.ID);
-                }
-
-                @Override
-                public void onRecordedProgramChanged(RecordedProgram recordedProgram) { }
-
-                @Override
-                public void onRecordedProgramRemoved(RecordedProgram recordedProgram) {
-                    if (mDvrDataManager != null && mDvrDataManager.getRecordedPrograms().isEmpty()
-                            && mDvrDataManager.getStartedRecordings().isEmpty()
-                            && mDvrDataManager.getNonStartedScheduledRecordings().isEmpty()
-                            && mDvrDataManager.getSeriesRecordings().isEmpty()) {
-                        mMenu.update(ChannelsRow.ID);
-                    }
-                }
-            };
-    private final OnDvrScheduleLoadFinishedListener mDvrScheduleLoadedListener =
-            new OnDvrScheduleLoadFinishedListener() {
-                @Override
-                public void onDvrScheduleLoadFinished() {
-                    mMenu.update(ChannelsRow.ID);
-                }
-            };
-    private final ScheduledRecordingListener mScheduledRecordingListener =
-            new ScheduledRecordingListener() {
-                @Override
-                public void onScheduledRecordingAdded(ScheduledRecording... scheduledRecordings) {
-                    mMenu.update(ChannelsRow.ID);
-                }
-
-                @Override
-                public void onScheduledRecordingRemoved(ScheduledRecording... scheduledRecordings) {
-                    if (mDvrDataManager != null && mDvrDataManager.getRecordedPrograms().isEmpty()
-                            && mDvrDataManager.getStartedRecordings().isEmpty()
-                            && mDvrDataManager.getNonStartedScheduledRecordings().isEmpty()
-                            && mDvrDataManager.getSeriesRecordings().isEmpty()) {
-                        mMenu.update(ChannelsRow.ID);
-                    }
-                }
-
-                @Override
-                public void onScheduledRecordingStatusChanged(ScheduledRecording... schedules) { }
-    };
 
     private final ChannelTuner.Listener mChannelTunerListener = new ChannelTuner.Listener() {
         @Override
@@ -131,16 +58,12 @@ public class MenuUpdater {
         mTvView = tvView;
         mMenu = menu;
         if (mTvView != null) {
-            mTvView.setOnScreenBlockedListener(mOnScreenBlockingChangeListener);
-        }
-        if (CommonFeatures.DVR.isEnabled(context)) {
-            mDvrDataManager = TvApplication.getSingletons(context).getDvrDataManager();
-            mDvrDataManager.addDvrScheduleLoadFinishedListener(mDvrScheduleLoadedListener);
-            mDvrDataManager.addScheduledRecordingListener(mScheduledRecordingListener);
-            mDvrDataManager.addRecordedProgramLoadFinishedListener(mRecordedProgramLoadedListener);
-            mDvrDataManager.addRecordedProgramListener(mRecordedProgramListener);
-        } else {
-            mDvrDataManager = null;
+            mTvView.setOnScreenBlockedListener(new OnScreenBlockingChangedListener() {
+                    @Override
+                    public void onScreenBlockingChanged(boolean blocked) {
+                        mMenu.update(PlayControlsRow.ID);
+                    }
+            });
         }
     }
 
@@ -163,13 +86,6 @@ public class MenuUpdater {
      * Called at the end of the menu's lifetime.
      */
     public void release() {
-        if (mDvrDataManager != null) {
-            mDvrDataManager.removeScheduledRecordingListener(mScheduledRecordingListener);
-            mDvrDataManager.removeRecordedProgramListener(mRecordedProgramListener);
-            mDvrDataManager.removeDvrScheduleLoadFinishedListener(mDvrScheduleLoadedListener);
-            mDvrDataManager
-                    .removeRecordedProgramLoadFinishedListener(mRecordedProgramLoadedListener);
-        }
         if (mChannelTuner != null) {
             mChannelTuner.removeListener(mChannelTunerListener);
         }

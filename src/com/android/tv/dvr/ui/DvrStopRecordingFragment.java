@@ -21,16 +21,22 @@ import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.v17.leanback.widget.GuidanceStylist.Guidance;
 import android.support.v17.leanback.widget.GuidedAction;
+import android.text.TextUtils;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
+import com.android.tv.data.Channel;
+import com.android.tv.data.ChannelDataManager;
 import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
 import com.android.tv.dvr.ScheduledRecording;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 
 /**
@@ -41,10 +47,33 @@ import java.util.List;
  */
 @TargetApi(Build.VERSION_CODES.N)
 public class DvrStopRecordingFragment extends DvrGuidedStepFragment {
-    private static final int ACTION_STOP = 1;
+    /**
+     * The action ID for the stop action.
+     */
+    public static final int ACTION_STOP = 1;
+    /**
+     * Key for the program.
+     * Type: {@link com.android.tv.data.Program}.
+     */
+    public static final String KEY_REASON = "DvrStopRecordingFragment.type";
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({REASON_USER_STOP, REASON_ON_CONFLICT})
+    public @interface ReasonType {}
+    /**
+     * The dialog is shown because users want to stop some currently recording program.
+     */
+    public static final int REASON_USER_STOP = 1;
+    /**
+     * The dialog is shown because users want to record some program that is conflict to the
+     * current recording program.
+     */
+    public static final int REASON_ON_CONFLICT = 2;
 
     private ScheduledRecording mSchedule;
     private DvrDataManager mDvrDataManager;
+    private @ReasonType int mStopReason;
+
     private final ScheduledRecordingListener mScheduledRecordingListener =
             new ScheduledRecordingListener() {
                 @Override
@@ -85,6 +114,7 @@ public class DvrStopRecordingFragment extends DvrGuidedStepFragment {
         }
         mDvrDataManager = TvApplication.getSingletons(context).getDvrDataManager();
         mDvrDataManager.addScheduledRecordingListener(mScheduledRecordingListener);
+        mStopReason = args.getInt(KEY_REASON);
     }
 
     @Override
@@ -99,7 +129,20 @@ public class DvrStopRecordingFragment extends DvrGuidedStepFragment {
     @Override
     public Guidance onCreateGuidance(Bundle savedInstanceState) {
         String title = getString(R.string.dvr_stop_recording_dialog_title);
-        String description = getString(R.string.dvr_stop_recording_dialog_description);
+        String description;
+        if (mStopReason == REASON_ON_CONFLICT) {
+            String programTitle = mSchedule.getProgramTitle();
+            if (TextUtils.isEmpty(programTitle)) {
+                ChannelDataManager channelDataManager =
+                        TvApplication.getSingletons(getActivity()).getChannelDataManager();
+                Channel channel = channelDataManager.getChannel(mSchedule.getChannelId());
+                programTitle = channel.getDisplayName();
+            }
+            description = getString(R.string.dvr_stop_recording_dialog_description_on_conflict,
+                    mSchedule.getProgramTitle());
+        } else {
+            description = getString(R.string.dvr_stop_recording_dialog_description);
+        }
         Drawable image = getResources().getDrawable(R.drawable.ic_warning_white_96dp, null);
         return new Guidance(title, description, null, image);
     }
@@ -114,13 +157,5 @@ public class DvrStopRecordingFragment extends DvrGuidedStepFragment {
         actions.add(new GuidedAction.Builder(context)
                 .clickAction(GuidedAction.ACTION_ID_CANCEL)
                 .build());
-    }
-
-    @Override
-    public void onGuidedActionClicked(GuidedAction action) {
-        if (action.getId() == ACTION_STOP) {
-            getDvrManager().stopRecording(mSchedule);
-        }
-        dismissDialog();
     }
 }

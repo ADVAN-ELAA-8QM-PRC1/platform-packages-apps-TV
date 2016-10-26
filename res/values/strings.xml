@@ -428,9 +428,9 @@
     <!-- The text message which is shown when the tune fails due to no available tuners.
          This message is shown at the center of the screen. [CHAR LIMIT=NONE] -->
     <plurals name="tvview_msg_input_no_resource">
-        <item quantity="one">This channel can\'t be played until <xliff:g id="end_time" example="9:30 PM">%1$s</xliff:g> because the tuner is being used for recording other programs.
+        <item quantity="one">This channel can\'t be played until <xliff:g id="end_time" example="9:30 PM">%1$s</xliff:g> because another channel is being recorded.
 \n\nPress Right to adjust recording schedule.</item>
-        <item quantity="other">This channel can\'t be played until <xliff:g id="end_time" example="9:30 PM">%1$s</xliff:g> because all the tuners are being used for recording other programs.
+        <item quantity="other">This channel can\'t be played until <xliff:g id="end_time" example="9:30 PM">%1$s</xliff:g> because other channels are being recorded.
 \n\nPress Right to adjust recording schedule.</item>
     </plurals>
 
@@ -520,6 +520,10 @@
     <string name="menu_developer_options" translatable="false">Developer options</string>
     <string name="dev_item_watch_history" translatable="false">Watch history</string>
     <string name="dev_item_fetch_epg" translatable="false">Fetch program guide</string>
+    <string name="dev_item_send_feedback" translatable="false">Send feedback</string>
+    <string name="dev_item_store_ts_on" translatable="false">Store TS for debugging: On</string>
+    <string name="dev_item_store_ts_off" translatable="false">Store TS for debugging: Off</string>
+    <string name="dev_item_store_ts_description" translatable="false">Store some TS data before exceptions/crash for debugging.</string>
 
     <!-- Title of Recently watched dialog. It is used for debug purpose. -->
     <string name="recently_watched" translatable="false">Recently watched</string>
@@ -553,7 +557,7 @@
     <string name="epg_dvr_delete_program" translatable="false">Delete schedule</string>
 
     <!-- Menu item label to start DVR manager UI. -->
-    <string name="channels_item_dvr" translatable="false">Recorded programs</string>
+    <string name="channels_item_dvr">Recordings &amp; schedules</string>
     <!-- Menu item label to start recording of the current channel. -->
     <string name="channels_item_record_start" translatable="false">Start recording</string>
     <!-- Menu item label to start recording of the current channel. -->
@@ -586,8 +590,10 @@
     <string name="dvr_msg_channel_unknown" translatable="false">Channel unknown</string>
     <string name="dvr_msg_no_available_tuners_for_recording_channel" translatable="false">No available tuners to record this channel.</string>
     <string name="dvr_msg_channel_already_recording" translatable="false">The channel is already being recorded.</string>
-    <string name="dvr_msg_cannot_record_channel" translatable="false">The channel cannot be recorded.</string>
-    <string name="dvr_msg_cannot_record_program" translatable="false">The program cannot be recorded.</string>
+    <!-- Toast message that the current channel cannot be recorded. -->
+    <string name="dvr_msg_cannot_record_channel">The channel cannot be recorded.</string>
+    <!-- Toast message that the current program cannot be recorded. -->
+    <string name="dvr_msg_cannot_record_program">The program cannot be recorded.</string>
     <string name="dvr_msg_no_item_in_browse" translatable="false">There is no item.</string>
     <!-- Toast message that a new recording schedule has been created from the user action. -->
     <string name="dvr_msg_program_scheduled"><xliff:g id="programName" example="Big bang theory">%1$s</xliff:g> has been scheduled to be recorded</string>
@@ -646,6 +652,8 @@
     <string name="dvr_detail_series_season_title">Season <xliff:g id="season_number">%1$s</xliff:g></string>
     <!-- Button label to open full schedule list page [CHAR LIMIT=15] -->
     <string name="dvr_detail_view_schedule">View schedule</string>
+    <!-- Text label to indicate there's more text in the details description [CHAR LIMIT=20] -->
+    <string name="dvr_detail_read_more">Read more</string>
 
     <!-- DVR series settings -->
     <eat-comment />
@@ -655,7 +663,7 @@
     <string name="dvr_series_deletion_description">Select the episodes you would like to delete. They can\'t be recovered once deleted.</string>
     <!-- Toast message of no recordings can be deleted [CHAR LIMIT=40] -->
     <string name="dvr_series_deletion_no_recordings">There\'re no recordings to delete.</string>
-    <!-- Button label to select all watched episodes of the given series [CHAR LIMIT=30] -->
+    <!-- Button label to select all watched episodes of the given series [CHAR LIMIT=35] -->
     <string name="dvr_series_select_watched">Select watched episodes</string>
     <!-- Button label to select all episodes of the given series [CHAR LIMIT=35] -->
     <string name="dvr_series_select_all">Select all episodes</string>
@@ -682,6 +690,9 @@
     <!-- Item description when the current series has the lowest proirty among scheduled
          TV series. -->
     <string name="dvr_series_settings_priority_lowest">Lowest</string>
+    <!-- Item description of the priority rank of the current series among all scheduled
+         TV series. -->
+    <string name="dvr_series_settings_priority_rank">No. <xliff:g id="rank">%1$d</xliff:g></string>
     <!-- Item label to specify channel which will be recorded for TV series recording -->
     <string name="dvr_series_settings_channels">Channels</string>
     <!-- Sub item label to record TV series from any channel. c.f., a user can
@@ -690,7 +701,7 @@
     <!-- Title of priority settings fragment -->
     <string name="dvr_priority_title">Choose priority</string>
     <!-- Description of priority settings fragment -->
-    <string name="dvr_priority_description">When there are not enough tuners to record programs at the same time, only the programs with higher priorities will be recorded.</string>
+    <string name="dvr_priority_description">When there are too many programs to be recorded at the same time, only the ones with higher priorities will be recorded.</string>
     <!-- Button lable in priority settings fragment to save the current settings -->
     <string name="dvr_priority_button_action_save">Save</string>
     <!-- Button label in priority settings fragment for one-time recordings -->
@@ -730,7 +741,7 @@
     <string name="dvr_action_record_anyway">Schedule anyway</string>
     <!-- The title of the action to record this program instead of the other. This happens when the
          user tries to record a program while there is a existing schedule with the same episode
-         as the program. [CHAR LIMIT=32] -->
+         as the program. [CHAR LIMIT=35] -->
     <string name="dvr_action_record_instead">Record this one instead</string>
     <!-- The title of the action to cancel to create the new schedule. This happens when the user
          created a schedule while there is a existing schedule with the same episode as the program.
@@ -746,14 +757,24 @@
     <string name="dvr_epg_program_recording_conflict">Recording conflict</string>
     <!-- Dvr label in epg to indicate the program is recording now. [CHAR LIMIT=30] -->
     <string name="dvr_epg_program_recording_in_progress">Recording</string>
+    <!-- Dvr label in epg to indicate the recording of the program has been failed. [CHAR LIMIT=30] -->
+    <string name="dvr_epg_program_recording_failed">Recording failed</string>
     <string name="dvr_epg_program_icon_text" translatable="false">DVR</string>
     <string name="dvr_epg_channel_watch_conflict_dialog_title" translatable="false">Upcoming schedules</string>
     <string name="dvr_epg_channel_watch_conflict_dialog_description" translatable="false">The programs will not be recorded if you keep watching this channel. Cancel the recordings, or current channel will be blocked when the recording starts.</string>
     <!-- A popup message which informs that Live TV is reading program information to create
          recording schedules. -->
     <string name="dvr_schedule_progress_message_reading_programs">Reading programs to create recording schedules</string>
+    <!-- A popup message which informs that Live TV is reading program information. -->
+    <string name="dvr_series_schedules_progress_message_reading_programs">Reading programs</string>
+    <!-- A popup message which informs that Live TV is updating series recording. -->
+    <string name="dvr_series_schedules_progress_message_updating_programs">Updating series recording</string>
     <string name="dvr_error_insufficient_space_title" translatable="false">Insufficient storage space</string>
     <string name="dvr_error_insufficient_space_description" translatable="false">No sufficient storage space for recording. Please clean up the storage.</string>
+    <!-- Dialog title which will be shown when the current storage is too small for DVR. -->
+    <string name="dvr_error_small_sized_storage_title">DVR needs more storage</string>
+    <!-- Dialog description which will be shown when tthe current storage is too small for DVR. -->
+    <string name="dvr_error_small_sized_storage_description">You will be able to record programs with DVR. However there is not enough storage on your device now for DVR to work. Please connect an external drive that is <xliff:g id="storage size" example="10GB">%1$s</xliff:g>GB or larger and follow the steps to format it as device storage.</string>
     <!-- Dialog title which will be shown when the current DVR storage is not accessible. -->
     <string name="dvr_error_missing_storage_title">Missing storage</string>
     <!-- Dialog description which will be shown when the current DVR storage is not accessible. -->
@@ -763,6 +784,8 @@
     <!-- Dialog description which will be shown when you confirmed to forget the current DVR
          storage. -->
     <string name="dvr_error_forget_storage_description">All your recorded content and schedules will be lost.</string>
+    <!-- The recording being requested to play is not existent in storage. It may be deleted. -->
+    <string name="dvr_toast_recording_deleted" translatable="false">The recording seems to be deleted.</string>
 
     <!-- DVR half sized dialogs -->
     <eat-comment />
@@ -771,7 +794,10 @@
     <string name="dvr_stop_recording_dialog_title">Stop recording?</string>
     <!-- The description of the stop recording dialog which asks the user whether to stop recording
          of the current channel or not. -->
-    <string name="dvr_stop_recording_dialog_description">The recorded part will be saved in the DVR library.</string>
+    <string name="dvr_stop_recording_dialog_description">The recorded content will be saved.</string>
+    <!-- The description of the stop recording dialog which asks the user whether to stop the
+        current recording to start another conflict schedule. -->
+    <string name="dvr_stop_recording_dialog_description_on_conflict">The recording of <xliff:g id="programName" example="Friends">%1$s</xliff:g> will be stopped because it conflicts with this program. The recorded content will be saved.</string>
     <!--The title of the dialog to notify the user that the new schedule conflicts with others. -->
     <string name="dvr_program_conflict_dialog_title">Recording scheduled but has conflicts</string>
     <!--The title of the dialog to notify the user that the recording of the current channel
@@ -819,6 +845,48 @@
     <!-- The description of the dialog which notifies the user that the same episode as the program
          has already been recorded. -->
     <string name="dvr_already_recorded_dialog_description">This program has already been recorded. It’s available in the DVR library.</string>
+    <!-- The title of dialog that notifies the user the series recording has been scheduled. -->
+    <string name="dvr_series_recording_dialog_title">Series recording scheduled</string>
+    <!-- The description of the dialog which notifies how many schedules has been added
+         for series recording.-->
+    <plurals name="dvr_series_recording_scheduled_no_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s.</item>
+    </plurals>
+    <!-- The description of the dialog which notifies how many schedules has been added
+         for series recording. But some of them won't be recorded due to conflicts. -->
+    <plurals name="dvr_series_recording_scheduled_only_this_series_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s. %3$d of them will not be recorded due to conflicts.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s. %3$d of them will not be recorded due to conflicts.</item>
+    </plurals>
+    <!-- The description of the dialog which notifies how many schedules has been added
+         for series recording. But only 1 episode of other series won't be recorded due to conflict
+         with this series. -->
+    <plurals name="dvr_series_recording_scheduled_this_and_other_series_one_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s. 1 episode of this series and other series will not be recorded due to conflicts.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s. 1 episode of this series and other series will not be recorded due to conflicts.</item>
+    </plurals>
+    <!-- The description of the dialog which notifies how many schedules has been added
+        for series recording. But some episodes of other series won't be recorded due to conflict
+        with this. -->
+    <plurals name="dvr_series_recording_scheduled_this_and_other_series_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s. %3$d episodes of this series and other series will not be recorded due to conflicts.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s. %3$d episodes of this series and other series will not be recorded due to conflicts.</item>
+    </plurals>
+    <!-- The description of the dialog which notifies how many schedules has been added
+        for series recording. But only 1 episode of other series won't be recorded due to conflict
+        with this series but no conflicts in this series. -->
+    <plurals name="dvr_series_recording_scheduled_only_other_series_one_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s. 1 episode of other series will not be recorded due to conflicts.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s. 1 episode of other series will not be recorded due to conflicts.</item>
+    </plurals>
+    <!-- The description of the dialog which notifies how many schedules has been added
+      for series recording. But some of other series won't be recorded due to conflict with this
+      series but no conflicts in this series . -->
+    <plurals name="dvr_series_recording_scheduled_only_other_series_conflict">
+        <item quantity="one">%1$d recording has been scheduled for %2$s. %3$d episodes of other series will not be recorded due to conflicts.</item>
+        <item quantity="other">%1$d recordings have been scheduled for %2$s. %3$d episodes of other series will not be recorded due to conflicts.</item>
+    </plurals>
 
     <!-- DVR playback strings -->
     <eat-comment />
@@ -859,23 +927,23 @@
     <!-- Description of no schedule recording for now, and ask user to schedule recordings from
          the program guide. -->
     <string name="dvr_schedules_empty_state">There are no recordings on schedule yet.\nYou can schedule recording from the program guide.</string>
-    <!-- Description of schedule list header about how many days the recording list will show. -->
+    <!-- Description of schedule list header about how many recordings conflict. -->
     <plurals name="dvr_series_schedules_header_description">
-        <item quantity="one">Recording schedule for the next %1$d day</item>
-        <item quantity="other">Recording schedule for the next %1$d days</item>
+        <item quantity="one">%1$d recording conflict</item>
+        <item quantity="other">%1$d recording conflicts</item>
     </plurals>
-    <!-- Button label of settings for DVR series recordings [CHAR LIMIT=20] -->
-    <string name="dvr_series_schedules_settings">Settings</string>
-    <!-- Button label of cancelling all series recording list. -->
-    <string name="dvr_series_schedules_cancel_all" translatable="false">Pause all schedules</string>
-    <!-- Description of asking user whether to cancel all schedules. -->
-    <string name="dvr_series_schedules_dialog_cancel_all" translatable="false">Pause all schedules?</string>
-    <!-- Action to leave the dialog to the previous screen. -->
-    <string name="dvr_series_schedules_dialog_back">Back</string>
-    <!-- Button label of resume all canceled series recording list. -->
-    <string name="dvr_series_schedules_resume" translatable="false">Resume all schedules</string>
-    <!-- Button label of undo cancel all series recording list. -->
-    <string name="dvr_series_schedules_undo">Undo</string>
+    <!-- Button label of settings for DVR series recordings [CHAR LIMIT=25] -->
+    <string name="dvr_series_schedules_settings">Series settings</string>
+    <!-- Button label of the action which starts creating schedules for the series automatically.[CHAR LIMIT=32] -->
+    <string name="dvr_series_schedules_start">Start series recording</string>
+    <!-- Button label of the action which stops creating schedules for the series automatically. [CHAR LIMIT=32]-->
+    <string name="dvr_series_schedules_stop">Stop series recording</string>
+    <!-- The title of asking user whether to stop creating schedules. -->
+    <string name="dvr_series_schedules_stop_dialog_title">Stop series recording?</string>
+    <!-- The description of asking user whether to stop creating schedules for the series. -->
+    <string name="dvr_series_schedules_stop_dialog_description">Recorded episodes will remain available in the DVR library.</string>
+    <!-- Action to stop creating the schedules for the series. -->
+    <string name="dvr_series_schedules_stop_dialog_action_stop">Stop</string>
     <!-- Description of no episodes in series recording, and the episodes will be recorded once
          they are available. -->
     <string name="dvr_series_schedules_empty_state">No episodes are available.\nThey will be recorded once they are available.</string>

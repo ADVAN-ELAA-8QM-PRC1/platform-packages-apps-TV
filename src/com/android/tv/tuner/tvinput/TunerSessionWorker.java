@@ -45,6 +45,7 @@ import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.ExoPlayer;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.common.TvContentRatingCache;
+import com.android.tv.tuner.TunerPreferences;
 import com.android.tv.tuner.data.Cea708Data;
 import com.android.tv.tuner.data.Channel;
 import com.android.tv.tuner.data.PsipData.EitItem;
@@ -56,8 +57,8 @@ import com.android.tv.tuner.exoplayer.MpegTsRendererBuilder;
 import com.android.tv.tuner.exoplayer.buffer.BufferManager;
 import com.android.tv.tuner.exoplayer.buffer.DvrStorageManager;
 import com.android.tv.tuner.exoplayer.MpegTsPlayer;
-import com.android.tv.tuner.source.TsMediaDataSource;
-import com.android.tv.tuner.source.TsMediaDataSourceManager;
+import com.android.tv.tuner.source.TsDataSource;
+import com.android.tv.tuner.source.TsDataSourceManager;
 import com.android.tv.tuner.util.StatusTextUtils;
 
 import java.io.File;
@@ -112,6 +113,8 @@ public class TunerSessionWorker implements PlaybackBufferListener,
     private static final int MSG_BUFFER_STATE_CHANGED = 1021;
     private static final int MSG_PROGRAM_DATA_RESULT = 1022;
     private static final int MSG_STOP_TUNE = 1023;
+    private static final int MSG_SET_SURFACE = 1024;
+    private static final int MSG_NOTIFY_AUDIO_TRACK_UPDATED = 1025;
 
     private static final int TS_PACKET_SIZE = 188;
     private static final int CHECK_NO_SIGNAL_INITIAL_DELAY_MS = 4000;
@@ -121,9 +124,11 @@ public class TunerSessionWorker implements PlaybackBufferListener,
     private static final int RESCHEDULE_PROGRAMS_INITIAL_DELAY_MS = 4000;
     private static final int RESCHEDULE_PROGRAMS_INTERVAL_MS = 10000;
     private static final int RESCHEDULE_PROGRAMS_TOLERANCE_MS = 2000;
+    // The following 3s is defined empirically. This should be larger than 2s considering video
+    // key frame interval in the TS stream.
     private static final int PLAYBACK_STATE_CHANGED_WAITING_THRESHOLD_MS = 3000;
     private static final int PLAYBACK_RETRY_DELAY_MS = 5000;
-    private static final int MAX_RETRY_COUNT = 5;
+    private static final int MAX_IMMEDIATE_RETRY_COUNT = 5;
     private static final long INVALID_TIME = -1;
 
     // Some examples of the track ids of the audio tracks, "a0", "a1", "a2".
@@ -145,7 +150,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
 
     private final Context mContext;
     private final ChannelDataManager mChannelDataManager;
-    private final TsMediaDataSourceManager mSourceManager;
+    private final TsDataSourceManager mSourceManager;
     private volatile Surface mSurface;
     private volatile float mVolume = 1.0f;
     private volatile boolean mCaptionEnabled;
@@ -179,6 +184,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
     private final TvContentRatingCache mTvContentRatingCache = TvContentRatingCache.getInstance();
     private final TunerSession mSession;
     private int mPlayerState = ExoPlayer.STATE_IDLE;
+    private long mPreparingStartTimeMs;
     private long mBufferingStartTimeMs;
     private long mReadyStartTimeMs;
 
@@ -196,7 +202,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
         mChannelDataManager = channelDataManager;
         mChannelDataManager.setListener(this);
         mChannelDataManager.checkDataVersion(mContext);
-        mSourceManager = TsMediaDataSourceManager.createSourceManager(false);
+        mSourceManager = TsDataSourceManager.createSourceManager(false);
         mTvInputManager = (TvInputManager) context.getSystemService(Context.TV_INPUT_SERVICE);
         mTvTracks = new ArrayList<>();
         mAudioTrackMap = new SparseArray<>();
@@ -206,6 +212,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
         mCaptionEnabled = captioningManager.isEnabled();
         mPlaybackParams.setSpeed(1.0f);
         mBufferManager = bufferManager;
+        mPreparingStartTimeMs = INVALID_TIME;
         mBufferingStartTimeMs = INVALID_TIME;
         mReadyStartTimeMs = INVALID_TIME;
     }
@@ -236,7 +243,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
         // mSurface is kept even when tune is called right after. But, messages can be deleted by
         // tune or updateChannelBlockStatus. So mSurface should be stored here, not through message.
         mSurface = surface;
-        mHandler.sendEmptyMessage(MSG_RESET_PLAYBACK);
+        mHandler.sendEmptyMessage(MSG_SET_SURFACE);
     }
 
     /**
@@ -355,6 +362,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             return;
         }
         mReadyStartTimeMs = INVALID_TIME;
+        mPreparingStartTimeMs = INVALID_TIME;
         mBufferingStartTimeMs = INVALID_TIME;
         if (playbackState == ExoPlayer.STATE_READY) {
             if (DEBUG) Log.d(TAG, "ExoPlayer ready");
@@ -362,6 +370,8 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 sendMessage(MSG_START_PLAYBACK, mPlayer);
             }
             mReadyStartTimeMs = SystemClock.elapsedRealtime();
+        } else if (playbackState == ExoPlayer.STATE_PREPARING) {
+            mPreparingStartTimeMs = SystemClock.elapsedRealtime();
         } else if (playbackState == ExoPlayer.STATE_BUFFERING) {
             mBufferingStartTimeMs = SystemClock.elapsedRealtime();
         } else if (playbackState == ExoPlayer.STATE_ENDED) {
@@ -377,6 +387,12 @@ public class TunerSessionWorker implements PlaybackBufferListener,
 
     @Override
     public void onError(Exception e) {
+        if (TunerPreferences.getStoreTsStream(mContext)) {
+            // Crash intentionally to capture the error causing TS file.
+            Log.e(TAG, "Crash intentionally to capture the error causing TS file. "
+                    + e.getMessage());
+            SoftPreconditions.checkState(false);
+        }
         // There maybe some errors that finally raise ExoPlaybackException and will be handled here.
         // If we are playing live stream, retrying playback maybe helpful. But for recorded stream,
         // retrying playback is not helpful.
@@ -401,7 +417,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             if (DEBUG) Log.d(TAG, "MSG_DRAWN_TO_SURFACE");
             mBufferStartTimeMs = mRecordStartTimeMs =
                     (mRecordingId != null) ? 0 : System.currentTimeMillis();
-            mSession.notifyVideoAvailable();
+            notifyVideoAvailable();
             mReportedDrawnToSurface = true;
 
             // If surface is drawn successfully, it means that the playback was brought back
@@ -415,6 +431,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             } else {
                 stopCaptionTrack();
             }
+            mHandler.sendEmptyMessage(MSG_NOTIFY_AUDIO_TRACK_UPDATED);
         }
     }
 
@@ -584,6 +601,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 if (mHandler.hasMessages(MSG_TUNE)) {
                     return true;
                 }
+                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING);
                 Uri channelUri = (Uri) msg.obj;
                 String recording = null;
                 long channelId = parseChannel(channelUri);
@@ -595,8 +613,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 if (channel == null && recording == null) {
                     Log.w(TAG, "onTune() is failed. Can't find channel for " + channelUri);
                     stopTune();
-                    mSession.notifyVideoUnavailable(
-                            TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
+                    notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
                     return true;
                 }
                 mHandler.removeCallbacksAndMessages(null);
@@ -619,8 +636,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 stopPlayback();
                 stopCaptionTrack();
                 resetTvTracks();
-                mSession.notifyVideoUnavailable(
-                        TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
+                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
                 return true;
             }
             case MSG_RELEASE: {
@@ -642,7 +658,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                     if (DEBUG) {
                         Log.d(TAG, "MSG_RETRY_PLAYBACK " + mRetryCount);
                     }
-                    if (mRetryCount <= MAX_RETRY_COUNT) {
+                    if (mRetryCount <= MAX_IMMEDIATE_RETRY_COUNT) {
                         resetPlayback();
                     } else {
                         // When it reaches this point, it may be due to an error that occurred in
@@ -651,11 +667,10 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                         stopPlayback();
                         stopCaptionTrack();
 
-                        mSession.notifyVideoUnavailable(
-                                TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
+                        notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
 
-                        // After MAX_RETRY_COUNT, give some delay of an empirically chosen value
-                        // before recovering the playback.
+                        // After MAX_IMMEDIATE_RETRY_COUNT, give some delay of an empirically chosen
+                        // value before recovering the playback.
                         mHandler.sendEmptyMessageDelayed(MSG_RESET_PLAYBACK,
                                 RECOVER_STOPPED_PLAYBACK_PERIOD_MS);
                     }
@@ -742,10 +757,16 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 return true;
             }
             case MSG_TRICKPLAY_BY_SEEK: {
+                if (mPlayer == null) {
+                    return true;
+                }
                 doTrickplayBySeek(msg.arg1);
                 return true;
             }
             case MSG_SMOOTH_TRICKPLAY_MONITOR: {
+                if (mPlayer == null) {
+                    return true;
+                }
                 long systemCurrentTime = System.currentTimeMillis();
                 long position = getCurrentPosition();
                 if (mRecordingId == null) {
@@ -811,21 +832,33 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             }
             case MSG_TIMESHIFT_PAUSE: {
                 if (DEBUG) Log.d(TAG, "MSG_TIMESHIFT_PAUSE");
+                if (mPlayer == null) {
+                    return true;
+                }
                 doTimeShiftPause();
                 return true;
             }
             case MSG_TIMESHIFT_RESUME: {
                 if (DEBUG) Log.d(TAG, "MSG_TIMESHIFT_RESUME");
+                if (mPlayer == null) {
+                    return true;
+                }
                 doTimeShiftResume();
                 return true;
             }
             case MSG_TIMESHIFT_SEEK_TO: {
                 long position = (long) msg.obj;
                 if (DEBUG) Log.d(TAG, "MSG_TIMESHIFT_SEEK_TO (position=" + position + ")");
+                if (mPlayer == null) {
+                    return true;
+                }
                 doTimeShiftSeekTo(position);
                 return true;
             }
             case MSG_TIMESHIFT_SET_PLAYBACKPARAMS: {
+                if (mPlayer == null) {
+                    return true;
+                }
                 doTimeShiftSetPlaybackParams((PlaybackParams) msg.obj);
                 return true;
             }
@@ -874,7 +907,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 if (mChannel == null || mPlayer == null) {
                     return true;
                 }
-                TsMediaDataSource source = mPlayer.getDataSource();
+                TsDataSource source = mPlayer.getDataSource();
                 long limitInBytes = source != null ? source.getBufferedPosition() : 0L;
                 long positionInBytes = source != null ? source.getLastReadPosition() : 0L;
                 if (TunerDebug.ENABLED) {
@@ -905,16 +938,21 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                 boolean isBufferingTooLong = mBufferingStartTimeMs != INVALID_TIME
                         && currentTime - mBufferingStartTimeMs
                                 > PLAYBACK_STATE_CHANGED_WAITING_THRESHOLD_MS;
+                boolean isPreparingTooLong = mPreparingStartTimeMs != INVALID_TIME
+                        && currentTime - mPreparingStartTimeMs
+                        > PLAYBACK_STATE_CHANGED_WAITING_THRESHOLD_MS;
                 boolean isWeakSignal = source != null
                         && mChannel.getType() == Channel.TYPE_TUNER
-                        && (noBufferRead || isBufferingTooLong);
+                        && (noBufferRead || isBufferingTooLong || isPreparingTooLong);
                 if (isWeakSignal && !mReportedWeakSignal) {
-                    mSession.notifyVideoUnavailable(
-                            TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
+                    if (!mHandler.hasMessages(MSG_RETRY_PLAYBACK)) {
+                        mHandler.sendMessageDelayed(mHandler.obtainMessage(
+                                MSG_RETRY_PLAYBACK, mPlayer), PLAYBACK_RETRY_DELAY_MS);
+                    }
                     if (mPlayer != null) {
                         mPlayer.setAudioTrack(false);
                     }
-                    mReportedWeakSignal = true;
+                    notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
                 } else if (!isWeakSignal && mReportedWeakSignal) {
                     boolean isPlaybackStable = mReadyStartTimeMs != INVALID_TIME
                             && currentTime - mReadyStartTimeMs
@@ -922,14 +960,28 @@ public class TunerSessionWorker implements PlaybackBufferListener,
                     if (!isPlaybackStable) {
                         // Wait until playback becomes stable.
                     } else if (mReportedDrawnToSurface) {
-                        mSession.notifyVideoAvailable();
+                        mHandler.removeMessages(MSG_RETRY_PLAYBACK);
+                        notifyVideoAvailable();
                         mPlayer.setAudioTrack(true);
-                        mReportedWeakSignal = false;
                     }
                 }
                 mLastLimitInBytes = limitInBytes;
                 mLastPositionInBytes = positionInBytes;
                 mHandler.sendEmptyMessageDelayed(MSG_CHECK_SIGNAL, CHECK_NO_SIGNAL_PERIOD_MS);
+                return true;
+            }
+            case MSG_SET_SURFACE: {
+                if (mPlayer != null) {
+                    mPlayer.setSurface(mSurface);
+                } else {
+                    // TODO: Since surface is dynamically set, we can remove the dependency of
+                    // playback start on mSurface nullity.
+                    resetPlayback();
+                }
+                return true;
+            }
+            case MSG_NOTIFY_AUDIO_TRACK_UPDATED: {
+                notifyAudioTracksUpdated();
                 return true;
             }
             default: {
@@ -955,8 +1007,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             mChannel.selectAudioTrack(audioTrack.index);
             int newAudioPid = mChannel.getAudioPid();
             if (oldAudioPid != newAudioPid) {
-                // TODO: Implement a switching between tracks more smoothly.
-                resetPlayback();
+                mPlayer.setSelectedTrack(MpegTsPlayer.TRACK_TYPE_AUDIO, audioTrack.index);
             }
             mSession.notifyTrackSelected(type, trackId);
         } else if (type == TvTrackInfo.TYPE_SUBTITLE) {
@@ -1061,32 +1112,47 @@ public class TunerSessionWorker implements PlaybackBufferListener,
         if (DEBUG) {
             Log.d(TAG, "Update AudioTracks " + audioTracks);
         }
-        removeTvTracks(TvTrackInfo.TYPE_AUDIO);
         mAudioTrackMap.clear();
         if (audioTracks != null) {
             int index = 0;
             for (AtscAudioTrack audioTrack : audioTracks) {
-                String language = audioTrack.language;
-                if (language == null && mChannel.getAudioTracks() != null
-                        && mChannel.getAudioTracks().size() == audioTracks.size()) {
-                    // If a language is not present, use a language field in PMT section parsed.
-                    language = mChannel.getAudioTracks().get(index).language;
-                }
-
-                // Save the index to the audio track.
-                // Later, when a audio track is selected, Both an audio pid and its audio stream
-                // type reside in the selected index position of the tuner channel's audio data.
                 audioTrack.index = index;
-                TvTrackInfo.Builder builder = new TvTrackInfo.Builder(
-                                TvTrackInfo.TYPE_AUDIO, AUDIO_TRACK_PREFIX + index);
-                builder.setLanguage(language);
-                builder.setAudioChannelCount(audioTrack.channelCount);
-                builder.setAudioSampleRate(audioTrack.sampleRate);
-                TvTrackInfo track = builder.build();
-                mTvTracks.add(track);
                 mAudioTrackMap.put(index, audioTrack);
                 ++index;
             }
+        }
+        mHandler.sendEmptyMessage(MSG_NOTIFY_AUDIO_TRACK_UPDATED);
+    }
+
+    private void notifyAudioTracksUpdated() {
+        if (mPlayer == null) {
+            // Audio tracks will be updated later once player initialization is done.
+            return;
+        }
+        int audioTrackCount = mPlayer.getTrackCount(MpegTsPlayer.TRACK_TYPE_AUDIO);
+        removeTvTracks(TvTrackInfo.TYPE_AUDIO);
+        for (int i = 0; i < audioTrackCount; i++) {
+            AtscAudioTrack audioTrack = mAudioTrackMap.get(i);
+            if (audioTrack == null) {
+                continue;
+            }
+            String language = audioTrack.language;
+            if (language == null && mChannel.getAudioTracks() != null
+                    && mChannel.getAudioTracks().size() == mAudioTrackMap.size()) {
+                // If a language is not present, use a language field in PMT section parsed.
+                language = mChannel.getAudioTracks().get(i).language;
+            }
+            // Save the index to the audio track.
+            // Later, when an audio track is selected, both the audio pid and its audio stream
+            // type reside in the selected index position of the tuner channel's audio data.
+            audioTrack.index = i;
+            TvTrackInfo.Builder builder = new TvTrackInfo.Builder(
+                    TvTrackInfo.TYPE_AUDIO, AUDIO_TRACK_PREFIX + i);
+            builder.setLanguage(language);
+            builder.setAudioChannelCount(audioTrack.channelCount);
+            builder.setAudioSampleRate(audioTrack.sampleRate);
+            TvTrackInfo track = builder.build();
+            mTvTracks.add(track);
         }
         mSession.notifyTracksChanged(mTvTracks);
     }
@@ -1170,10 +1236,11 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             mPlaybackParams.setSpeed(1.0f);
             mPlayerStarted = false;
             mReportedDrawnToSurface = false;
-            mReportedWeakSignal = false;
+            mPreparingStartTimeMs = INVALID_TIME;
             mBufferingStartTimeMs = INVALID_TIME;
             mReadyStartTimeMs = INVALID_TIME;
             mSession.sendUiMessage(TunerSession.MSG_UI_HIDE_AUDIO_UNPLAYABLE);
+            mSession.notifyTimeShiftStatusChanged(TvInputManager.TIME_SHIFT_STATUS_UNAVAILABLE);
         }
     }
 
@@ -1186,8 +1253,7 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             if (DEBUG) Log.d(TAG, "Channel " + mChannel + " does not have audio.");
             // Playbacks with video-only stream have not been tested yet.
             // No video-only channel has been found.
-            mSession.notifyVideoUnavailable(
-                    TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
+            notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN);
             return;
         }
         if (mChannel != null && ((mChannel.hasAudio() && !mPlayer.hasAudio())
@@ -1204,11 +1270,10 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             mPlayer.setPlayWhenReady(true);
             mPlayer.setVolume(mVolume);
             if (mChannel != null && !mChannel.hasVideo() && mChannel.hasAudio()) {
-                mSession.notifyVideoUnavailable(
-                        TvInputManager.VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY);
-            } else {
-                mSession.notifyVideoUnavailable(
-                        TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING);
+                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY);
+            } else if (!mReportedWeakSignal) {
+                // Doesn't show buffering during weak signal.
+                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING);
             }
             mSession.sendUiMessage(TunerSession.MSG_UI_HIDE_MESSAGE);
             mPlayerStarted = true;
@@ -1232,15 +1297,11 @@ public class TunerSessionWorker implements PlaybackBufferListener,
             mSourceManager.setKeepTuneStatus(false);
             player.release();
             if (!mHandler.hasMessages(MSG_TUNE)) {
-                if (mRetryCount < MAX_RETRY_COUNT) {
-                    // When prepare failed, there may be some errors related to hardware. In that
-                    // case, retry playback immediately may not help.
-                    mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_RETRY_PLAYBACK, mPlayer),
-                            PLAYBACK_RETRY_DELAY_MS);
-                } else {
-                    mSession.notifyVideoUnavailable(
-                                    TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
-                }
+                // When prepare failed, there may be some errors related to hardware. In that
+                // case, retry playback immediately may not help.
+                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
+                mHandler.sendMessageDelayed(mHandler.obtainMessage(MSG_RETRY_PLAYBACK, mPlayer),
+                        PLAYBACK_RETRY_DELAY_MS);
             }
         } else {
             mPlayer = player;
@@ -1263,7 +1324,6 @@ public class TunerSessionWorker implements PlaybackBufferListener,
         if (mChannelBlocked || mSurface == null) {
             return;
         }
-        mSession.notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING);
         preparePlayback();
     }
 
@@ -1505,5 +1565,19 @@ public class TunerSessionWorker implements PlaybackBufferListener,
     private boolean hasEnoughBackwardBuffer() {
         return mPlayer.getCurrentPosition() + BUFFER_UNDERFLOW_BUFFER_MS
                 >= mBufferStartTimeMs - mRecordStartTimeMs;
+    }
+
+    private void notifyVideoUnavailable(final int reason) {
+        mReportedWeakSignal = (reason == TvInputManager.VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL);
+        if (mSession != null) {
+            mSession.notifyVideoUnavailable(reason);
+        }
+    }
+
+    private void notifyVideoAvailable() {
+        mReportedWeakSignal = false;
+        if (mSession != null) {
+            mSession.notifyVideoAvailable();
+        }
     }
 }

@@ -17,10 +17,10 @@
 package com.android.tv.tuner.exoplayer;
 
 import android.content.Context;
-import android.media.MediaDataSource;
 
 import com.google.android.exoplayer.SampleSource;
 import com.google.android.exoplayer.TrackRenderer;
+import com.google.android.exoplayer.upstream.DataSource;
 import com.android.tv.tuner.exoplayer.MpegTsPlayer.RendererBuilder;
 import com.android.tv.tuner.exoplayer.MpegTsPlayer.RendererBuilderCallback;
 import com.android.tv.tuner.exoplayer.ac3.Ac3PassthroughTrackRenderer;
@@ -43,7 +43,7 @@ public class MpegTsRendererBuilder implements RendererBuilder {
     }
 
     @Override
-    public void buildRenderers(MpegTsPlayer mpegTsPlayer, MediaDataSource dataSource,
+    public void buildRenderers(MpegTsPlayer mpegTsPlayer, DataSource dataSource,
             RendererBuilderCallback callback) {
         // Build the video and audio renderers.
         SampleExtractor extractor = dataSource == null ?

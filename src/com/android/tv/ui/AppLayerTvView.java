@@ -55,7 +55,7 @@ public class AppLayerTvView extends TvView {
     public void onViewAdded(View child) {
         if (child instanceof SurfaceView) {
             // Note: See b/29118070 for detail.
-            ((SurfaceView) child).setSecure(Experiments.ENABLE_DEVELOPER_FEATURES.get());
+            ((SurfaceView) child).setSecure(!Experiments.ENABLE_DEVELOPER_FEATURES.get());
         }
         super.onViewAdded(child);
     }

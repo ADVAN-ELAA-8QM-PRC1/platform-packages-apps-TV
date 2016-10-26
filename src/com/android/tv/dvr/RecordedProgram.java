@@ -18,21 +18,25 @@ package com.android.tv.dvr;
 
 import static android.media.tv.TvContract.RecordedPrograms;
 
+import android.annotation.TargetApi;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.media.tv.TvContract;
 import android.net.Uri;
+import android.os.Build;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
 
 import com.android.tv.common.R;
 import com.android.tv.data.BaseProgram;
+import com.android.tv.data.GenreItems;
 import com.android.tv.data.InternalDataUtils;
 import com.android.tv.util.Utils;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Immutable instance of {@link android.media.tv.TvContract.RecordedPrograms}.
  */
+@TargetApi(Build.VERSION_CODES.N)
 public class RecordedProgram extends BaseProgram {
     public static final int ID_NOT_SET = -1;
 
@@ -553,6 +558,21 @@ public class RecordedProgram extends BaseProgram {
         return mCanonicalGenres;
     }
 
+    /**
+     * Returns array of canonical genre ID's for this recorded program.
+     */
+    @Override
+    public int[] getCanonicalGenreIds() {
+        if (mCanonicalGenres == null) {
+            return null;
+        }
+        int[] genreIds = new int[mCanonicalGenres.length];
+        for (int i = 0; i < mCanonicalGenres.length; i++) {
+            genreIds[i] = GenreItems.getId(mCanonicalGenres[i]);
+        }
+        return genreIds;
+    }
+
     @Override
     public long getChannelId() {
         return mChannelId;
@@ -622,6 +642,21 @@ public class RecordedProgram extends BaseProgram {
         }
     }
 
+    @Nullable
+    public String getEpisodeDisplayNumber(Context context) {
+        if (!TextUtils.isEmpty(mEpisodeNumber)) {
+            if (TextUtils.equals(mSeasonNumber, "0")) {
+                // Do not show "S0: ".
+                return String.format(context.getResources().getString(
+                        R.string.display_episode_number_format_no_season_number), mEpisodeNumber);
+            } else {
+                return String.format(context.getResources().getString(
+                        R.string.display_episode_number_format), mSeasonNumber, mEpisodeNumber);
+            }
+        }
+        return null;
+    }
+
     public long getExpireTimeUtcMillis() {
         return mExpireTimeUtcMillis;
     }
@@ -678,6 +713,7 @@ public class RecordedProgram extends BaseProgram {
         return mSearchable;
     }
 
+    @Override
     public String getSeriesId() {
         return mSeriesId;
     }
@@ -821,5 +857,12 @@ public class RecordedProgram extends BaseProgram {
     @Nullable
     private static String safeEncode(@Nullable String[] genres) {
         return genres == null ? null : TvContract.Programs.Genres.encode(genres);
+    }
+
+    /**
+     * Returns an array containing all of the elements in the list.
+     */
+    public static RecordedProgram[] toArray(Collection<RecordedProgram> recordedPrograms) {
+        return recordedPrograms.toArray(new RecordedProgram[recordedPrograms.size()]);
     }
 }

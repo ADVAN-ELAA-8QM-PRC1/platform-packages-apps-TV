@@ -123,6 +123,9 @@ public class Scheduler extends TvInputCallback implements ScheduledRecordingList
      * Stops the scheduler.
      */
     public void stop() {
+        for (InputTaskScheduler inputTaskScheduler : mInputSchedulerMap.values()) {
+            inputTaskScheduler.stop();
+        }
         mInputManager.removeCallback(this);
         mDataManager.removeScheduledRecordingListener(this);
     }
@@ -173,13 +176,7 @@ public class Scheduler extends TvInputCallback implements ScheduledRecordingList
         }
         boolean needToUpdateAlarm = false;
         for (ScheduledRecording schedule : schedules) {
-            TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext, schedule.getChannelId());
-            if (input == null) {
-                Log.e(TAG, "Can't find input for " + schedule);
-                mDataManager.changeState(schedule, ScheduledRecording.STATE_RECORDING_FAILED);
-                continue;
-            }
-            InputTaskScheduler scheduler = mInputSchedulerMap.get(input.getId());
+            InputTaskScheduler scheduler = mInputSchedulerMap.get(schedule.getInputId());
             if (scheduler != null) {
                 scheduler.removeSchedule(schedule);
                 needToUpdateAlarm = true;
@@ -198,12 +195,7 @@ public class Scheduler extends TvInputCallback implements ScheduledRecordingList
         }
         // Update the recordings.
         for (ScheduledRecording schedule : schedules) {
-            TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext, schedule.getChannelId());
-            if (input == null) {
-                Log.e(TAG, "Can't find input for " + schedule);
-                continue;
-            }
-            InputTaskScheduler scheduler = mInputSchedulerMap.get(input.getId());
+            InputTaskScheduler scheduler = mInputSchedulerMap.get(schedule.getInputId());
             if (scheduler != null) {
                 scheduler.updateSchedule(schedule);
             }
@@ -228,7 +220,7 @@ public class Scheduler extends TvInputCallback implements ScheduledRecordingList
     }
 
     private void scheduleRecordingSoon(ScheduledRecording schedule) {
-        TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext, schedule.getChannelId());
+        TvInputInfo input = Utils.getTvInputInfoForInputId(mContext, schedule.getInputId());
         if (input == null) {
             Log.e(TAG, "Can't find input for " + schedule);
             mDataManager.changeState(schedule, ScheduledRecording.STATE_RECORDING_FAILED);
@@ -260,7 +252,7 @@ public class Scheduler extends TvInputCallback implements ScheduledRecordingList
             Intent intent = new Intent(mContext, DvrStartRecordingReceiver.class);
             PendingIntent alarmIntent = PendingIntent.getBroadcast(mContext, 0, intent, 0);
             // This will cancel the previous alarm.
-            mAlarmManager.set(AlarmManager.RTC_WAKEUP, wakeAt, alarmIntent);
+            mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, wakeAt, alarmIntent);
         } else {
             if (DEBUG) Log.d(TAG, "No future recording, alarm not set");
         }

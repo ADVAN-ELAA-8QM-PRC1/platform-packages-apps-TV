@@ -126,10 +126,7 @@ public final class RecurringRunner {
         return next;
     }
 
-    /**
-     * Resets the next run time.
-     */
-    public long resetNextRunTime() {
+    private long resetNextRunTime() {
         long next = System.currentTimeMillis() + mIntervalMs;
         getSharedPreferences().edit().putLong(mName, next).apply();
         return next;

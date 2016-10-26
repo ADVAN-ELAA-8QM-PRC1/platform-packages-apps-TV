@@ -297,6 +297,16 @@ public class ChannelDataManager {
     }
 
     /**
+     * Checks if the channel exists in DB.
+     *
+     * <p>Note that the channels of the removed inputs can not be obtained from {@link #getChannel}.
+     * In that case this method is used to check if the channel exists in the DB.
+     */
+    public boolean doesChannelExistInDb(long channelId) {
+        return mChannelWrapperMap.get(channelId) != null;
+    }
+
+    /**
      * Returns true if and only if there exists at least one channel and all channels are hidden.
      */
     public boolean areAllChannelsHidden() {

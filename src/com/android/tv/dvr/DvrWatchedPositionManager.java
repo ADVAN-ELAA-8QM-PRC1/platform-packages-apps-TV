@@ -19,9 +19,12 @@ package com.android.tv.dvr;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.media.tv.TvInputManager;
+import android.support.annotation.IntDef;
 
 import com.android.tv.common.SharedPreferencesUtils;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,13 +40,33 @@ public class DvrWatchedPositionManager {
     private final boolean DEBUG = false;
 
     private SharedPreferences mWatchedPositions;
-    private final Context mContext;
     private final Map<Long, Set> mListeners = new HashMap<>();
 
+    /**
+     * The minimum percentage of recorded program being watched that will be considered as being
+     * completely watched.
+     */
+    public static final float DVR_WATCHED_THRESHOLD_RATE = 0.98f;
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({DVR_WATCHED_STATUS_NEW, DVR_WATCHED_STATUS_WATCHING, DVR_WATCHED_STATUS_WATCHED})
+    public @interface DvrWatchedStatus {}
+    /**
+     * The status indicates the recorded program has not been watched at all.
+     */
+    public static final int DVR_WATCHED_STATUS_NEW = 0;
+    /**
+     * The status indicates the recorded program is being watched.
+     */
+    public static final int DVR_WATCHED_STATUS_WATCHING = 1;
+    /**
+     * The status indicates the recorded program was completely watched.
+     */
+    public static final int DVR_WATCHED_STATUS_WATCHED = 2;
+
     public DvrWatchedPositionManager(Context context) {
-        mContext = context.getApplicationContext();
-        mWatchedPositions = mContext.getSharedPreferences(SharedPreferencesUtils
-                .SHARED_PREF_DVR_WATCHED_POSITION, Context.MODE_PRIVATE);
+        mWatchedPositions = context.getSharedPreferences(
+                SharedPreferencesUtils.SHARED_PREF_DVR_WATCHED_POSITION, Context.MODE_PRIVATE);
     }
 
     /**
@@ -60,6 +83,18 @@ public class DvrWatchedPositionManager {
     public long getWatchedPosition(long recordedProgramId) {
         return mWatchedPositions.getLong(Long.toString(recordedProgramId),
                 TvInputManager.TIME_SHIFT_INVALID_TIME);
+    }
+
+    @DvrWatchedStatus public int getWatchedStatus(RecordedProgram recordedProgram) {
+        long watchedPosition = getWatchedPosition(recordedProgram.getId());
+        if (watchedPosition == TvInputManager.TIME_SHIFT_INVALID_TIME) {
+            return DVR_WATCHED_STATUS_NEW;
+        } else if (watchedPosition > recordedProgram
+                .getDurationMillis() * DVR_WATCHED_THRESHOLD_RATE) {
+            return DVR_WATCHED_STATUS_WATCHED;
+        } else {
+            return DVR_WATCHED_STATUS_WATCHING;
+        }
     }
 
     /**

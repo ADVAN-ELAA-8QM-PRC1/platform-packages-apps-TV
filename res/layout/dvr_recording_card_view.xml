@@ -43,6 +43,20 @@
             android:visibility="gone"
             android:max="100"
             android:layout_gravity="bottom" />
+
+        <FrameLayout android:id="@+id/affiliated_icon_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/card_image_gradient"
+            android:visibility="invisible">
+
+            <ImageView android:id="@+id/affiliated_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|right"
+                android:layout_margin="12dp" />
+
+        </FrameLayout>
     </FrameLayout>
 
     <LinearLayout android:id="@+id/info_area"

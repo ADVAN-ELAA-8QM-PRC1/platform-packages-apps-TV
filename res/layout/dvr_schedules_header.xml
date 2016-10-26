@@ -29,21 +29,26 @@
             android:orientation="vertical"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_alignParentStart="true">
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@+id/button_container">
             <TextView android:id="@+id/header_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
                 android:textSize="20sp"
                 android:textColor="@color/dvr_schedules_item_main"/>
             <TextView android:id="@+id/header_description"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/dvr_schedules_header_subtitle_margin_top"
+                android:ellipsize="end"
+                android:singleLine="true"
                 android:textSize="14sp"
                 android:textColor="@color/dvr_schedules_header_description"/>
         </LinearLayout>
 
-        <FrameLayout android:id="@+id/button_container"
+        <FrameLayout android:id="@id/button_container"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_alignParentEnd="true"
@@ -60,7 +65,7 @@
                 android:orientation="horizontal">
                 <include android:id="@+id/series_settings"
                     layout="@layout/dvr_schedules_header_button" />
-                <include android:id="@+id/series_toggle_pause"
+                <include android:id="@+id/series_toggle_start_stop"
                     layout="@layout/dvr_schedules_header_button" />
             </LinearLayout>
         </FrameLayout>

@@ -235,6 +235,9 @@ public abstract class SideFragment extends Fragment implements HasTrackerLabel {
         void onSideFragmentViewDestroyed();
     }
 
+    /**
+     * Preloads the view holders.
+     */
     public static void preloadRecycledViews(Context context) {
         if (sRecycledViewPool != null) {
             return;
@@ -250,6 +253,13 @@ public abstract class SideFragment extends Fragment implements HasTrackerLabel {
                 sRecycledViewPool.putRecycledView(viewHolder);
             }
         }
+    }
+
+    /**
+     * Releases the pre-loaded view holders.
+     */
+    public static void releasePreloadedRecycledViews() {
+        sRecycledViewPool = null;
     }
 
     private static class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.ViewHolder> {

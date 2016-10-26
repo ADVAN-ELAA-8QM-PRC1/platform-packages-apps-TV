@@ -19,7 +19,6 @@ package com.android.tv.tuner.exoplayer;
 import android.content.Context;
 import android.media.AudioFormat;
 import android.media.MediaCodec.CryptoException;
-import android.media.MediaDataSource;
 import android.media.PlaybackParams;
 import android.os.Handler;
 import android.support.annotation.IntDef;
@@ -35,14 +34,15 @@ import com.google.android.exoplayer.MediaFormat;
 import com.google.android.exoplayer.TrackRenderer;
 import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.audio.AudioTrack;
+import com.google.android.exoplayer.upstream.DataSource;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.tuner.data.Cea708Data;
 import com.android.tv.tuner.data.Cea708Data.CaptionEvent;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.exoplayer.ac3.Ac3PassthroughTrackRenderer;
 import com.android.tv.tuner.exoplayer.ac3.Ac3TrackRenderer;
-import com.android.tv.tuner.source.TsMediaDataSource;
-import com.android.tv.tuner.source.TsMediaDataSourceManager;
+import com.android.tv.tuner.source.TsDataSource;
+import com.android.tv.tuner.source.TsDataSourceManager;
 import com.android.tv.tuner.tvinput.EventDetector;
 
 import java.lang.annotation.Retention;
@@ -59,7 +59,7 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
      * Interface definition for building specific track renderers.
      */
     public interface RendererBuilder {
-        void buildRenderers(MpegTsPlayer mpegTsPlayer, MediaDataSource dataSource,
+        void buildRenderers(MpegTsPlayer mpegTsPlayer, DataSource dataSource,
                 RendererBuilderCallback callback);
     }
 
@@ -125,14 +125,13 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
     private final ExoPlayer mPlayer;
     private final Handler mMainHandler;
     private final AudioCapabilities mAudioCapabilities;
-    private final TsMediaDataSourceManager mSourceManager;
+    private final TsDataSourceManager mSourceManager;
 
     private Listener mListener;
     @RendererBuildingState private int mRendererBuildingState;
-    private boolean mLastReportedPlayWhenReady;
 
     private Surface mSurface;
-    private TsMediaDataSource mMediaDataSource;
+    private TsDataSource mDataSource;
     private InternalRendererBuilderCallback mBuilderCallback;
     private TrackRenderer mVideoRenderer;
     private TrackRenderer mAudioRenderer;
@@ -147,12 +146,12 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
      *
      * @param rendererBuilder the builder of track renderers
      * @param handler the handler for the playback events in track renderers
-     * @param sourceManager the manager for {@link MediaDataSource}
+     * @param sourceManager the manager for {@link DataSource}
      * @param capabilities the {@link AudioCapabilities} of the current device
      * @param listener the listener for playback state changes
      */
     public MpegTsPlayer(RendererBuilder rendererBuilder, Handler handler,
-            TsMediaDataSourceManager sourceManager, AudioCapabilities capabilities,
+            TsDataSourceManager sourceManager, AudioCapabilities capabilities,
             Listener listener) {
         mRendererBuilder = rendererBuilder;
         mPlayer = ExoPlayer.Factory.newInstance(RENDERER_COUNT, MIN_BUFFER_MS, MIN_REBUFFER_MS);
@@ -213,7 +212,7 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
     }
 
     /**
-     * Creates renderers and {@link MediaDataSource} and initializes player.
+     * Creates renderers and {@link DataSource} and initializes player.
      * @param context a {@link Context} instance
      * @param channel to play
      * @param eventListener for program information which will be scanned from MPEG2-TS stream
@@ -221,14 +220,14 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
      */
     public boolean prepare(Context context, TunerChannel channel,
             EventDetector.EventListener eventListener) {
-        TsMediaDataSource source = null;
+        TsDataSource source = null;
         if (channel != null) {
             source = mSourceManager.createDataSource(context, channel, eventListener);
             if (source == null) {
                 return false;
             }
         }
-        mMediaDataSource = source;
+        mDataSource = source;
         if (mRendererBuildingState == RENDERER_BUILDING_STATE_BUILT) {
             mPlayer.stop();
         }
@@ -242,10 +241,10 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
     }
 
     /**
-     * Returns {@link TsMediaDataSource} which provides MPEG2-TS stream.
+     * Returns {@link TsDataSource} which provides MPEG2-TS stream.
      */
-    public TsMediaDataSource getDataSource() {
-        return mMediaDataSource;
+    public TsDataSource getDataSource() {
+        return mDataSource;
     }
 
     private void onRenderers(TrackRenderer[] renderers) {
@@ -347,9 +346,9 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
      * Releases the player.
      */
     public void release() {
-        if (mMediaDataSource != null) {
-            mSourceManager.releaseDataSource(mMediaDataSource);
-            mMediaDataSource = null;
+        if (mDataSource != null) {
+            mSourceManager.releaseDataSource(mDataSource);
+            mDataSource = null;
         }
         if (mBuilderCallback != null) {
             mBuilderCallback.cancel();
@@ -476,6 +475,23 @@ public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRen
      */
     public boolean hasAudio() {
         return mPlayer.getTrackCount(TRACK_TYPE_AUDIO) > 0;
+    }
+
+    /**
+     * Returns the number of tracks exposed by the specified renderer.
+     */
+    public int getTrackCount(int rendererIndex) {
+        return mPlayer.getTrackCount(rendererIndex);
+    }
+
+    /**
+     * Selects a track for the specified renderer.
+     */
+    public void setSelectedTrack(int rendererIndex, int trackIndex) {
+        if (trackIndex >= getTrackCount(rendererIndex)) {
+            return;
+        }
+        mPlayer.setSelectedTrack(rendererIndex, trackIndex);
     }
 
     /**

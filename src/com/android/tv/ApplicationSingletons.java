@@ -24,6 +24,7 @@ import com.android.tv.data.ProgramDataManager;
 import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrScheduleManager;
+import com.android.tv.dvr.DvrStorageStatusManager;
 import com.android.tv.dvr.DvrWatchedPositionManager;
 import com.android.tv.util.AccountHelper;
 import com.android.tv.util.TvInputManagerHelper;
@@ -38,6 +39,8 @@ public interface ApplicationSingletons {
     ChannelDataManager getChannelDataManager();
 
     DvrDataManager getDvrDataManager();
+
+    DvrStorageStatusManager getDvrStorageStatusManager();
 
     DvrScheduleManager getDvrScheduleManager();
 

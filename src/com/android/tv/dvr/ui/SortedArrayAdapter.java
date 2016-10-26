@@ -148,7 +148,10 @@ public abstract class SortedArrayAdapter<T> extends ArrayObjectAdapter {
         return -1;
     }
 
-    private int findInsertPosition(T item) {
+    /**
+     * Finds the position that the given item should be inserted to keep the sorted order.
+     */
+    public int findInsertPosition(T item) {
         for (int i = size() - mExtraItemCount - 1; i >=0; i--) {
             T r = (T) get(i);
             if (mComparator.compare(r, item) <= 0) {

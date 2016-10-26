@@ -40,6 +40,8 @@ import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.dvr.ui.DvrStopRecordingFragment;
+import com.android.tv.dvr.ui.HalfSizedDialogFragment;
 import com.android.tv.menu.Menu.MenuShowReason;
 import com.android.tv.ui.TunableTvView;
 import com.android.tv.util.Utils;
@@ -130,10 +132,11 @@ public class PlayControlsRowView extends MenuRowView {
                 res.getDimensionPixelSize(R.dimen.play_controls_button_compact_margin);
         if (CommonFeatures.DVR.isEnabled(context)) {
             mDvrDataManager = TvApplication.getSingletons(context).getDvrDataManager();
+            mDvrManager = TvApplication.getSingletons(context).getDvrManager();
         } else {
             mDvrDataManager = null;
+            mDvrManager = null;
         }
-        mDvrManager = TvApplication.getSingletons(context).getDvrManager();
         mMainActivity = (MainActivity) context;
     }
 
@@ -249,7 +252,7 @@ public class PlayControlsRowView extends MenuRowView {
 
     private boolean isCurrentChannelRecording() {
         Channel currentChannel = mMainActivity.getCurrentChannel();
-        return currentChannel != null
+        return currentChannel != null && mDvrManager != null
                 && mDvrManager.getCurrentRecording(currentChannel.getId()) != null;
     }
 
@@ -259,10 +262,11 @@ public class PlayControlsRowView extends MenuRowView {
         TvApplication.getSingletons(getContext()).getTracker().sendMenuClicked(isRecording ?
                 R.string.channels_item_record_start : R.string.channels_item_record_stop);
         if (!isRecording) {
-            if (!mDvrManager.isChannelRecordable(currentChannel)) {
+            if (!(mDvrManager != null && mDvrManager.isChannelRecordable(currentChannel))) {
                 Toast.makeText(mMainActivity, R.string.dvr_msg_cannot_record_channel,
                         Toast.LENGTH_SHORT).show();
-            } else {
+            } else if (DvrUiHelper.checkStorageStatusAndShowErrorMessage(mMainActivity,
+                    currentChannel.getInputId())) {
                 Program program = TvApplication.getSingletons(mMainActivity).getProgramDataManager()
                         .getCurrentProgram(currentChannel.getId());
                 if (program == null) {
@@ -274,14 +278,23 @@ public class PlayControlsRowView extends MenuRowView {
                     Toast.makeText(mMainActivity, msg, Toast.LENGTH_SHORT).show();
                 }
             }
-        } else {
-            DvrUiHelper.showStopRecordingDialog(mMainActivity, currentChannel);
+        } else if (currentChannel != null) {
+            DvrUiHelper.showStopRecordingDialog(mMainActivity, currentChannel.getId(),
+                    DvrStopRecordingFragment.REASON_USER_STOP,
+                    new HalfSizedDialogFragment.OnActionClickListener() {
+                        @Override
+                        public void onActionClick(long actionId) {
+                            if (actionId == DvrStopRecordingFragment.ACTION_STOP) {
+                                ScheduledRecording currentRecording =
+                                        mDvrManager.getCurrentRecording(
+                                                currentChannel.getId());
+                                if (currentRecording != null) {
+                                    mDvrManager.stopRecording(currentRecording);
+                                }
+                            }
+                        }
+                    });
         }
-    }
-
-    private boolean needToShowRecordButton() {
-        return CommonFeatures.DVR.isEnabled(getContext())
-                && mDvrManager.isChannelRecordable(mMainActivity.getCurrentChannel());
     }
 
     private void initializeButton(PlayControlsButton button, int imageResId,
@@ -609,7 +622,8 @@ public class PlayControlsRowView extends MenuRowView {
     }
 
     private void updateRecordButton() {
-        if (!needToShowRecordButton()) {
+        if (!(mDvrManager != null
+                && mDvrManager.isChannelRecordable(mMainActivity.getCurrentChannel()))) {
             mRecordButton.setVisibility(View.GONE);
             updateButtonMargin();
             return;

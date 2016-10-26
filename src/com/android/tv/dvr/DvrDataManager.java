@@ -69,11 +69,6 @@ public interface DvrDataManager {
     List<ScheduledRecording> getAvailableScheduledRecordings();
 
     /**
-     * Return all available and canceled {@link ScheduledRecording}.
-     */
-    List<ScheduledRecording> getAvailableAndCanceledScheduledRecordings();
-
-    /**
      * Returns started recordings that expired.
      */
     List<ScheduledRecording> getStartedRecordings();
@@ -260,10 +255,10 @@ public interface DvrDataManager {
      * Listens for changes to {@link RecordedProgram}s.
      */
     interface RecordedProgramListener {
-        void onRecordedProgramAdded(RecordedProgram recordedProgram);
+        void onRecordedProgramsAdded(RecordedProgram... recordedPrograms);
 
-        void onRecordedProgramChanged(RecordedProgram recordedProgram);
+        void onRecordedProgramsChanged(RecordedProgram... recordedPrograms);
 
-        void onRecordedProgramRemoved(RecordedProgram recordedProgram);
+        void onRecordedProgramsRemoved(RecordedProgram... recordedPrograms);
     }
 }

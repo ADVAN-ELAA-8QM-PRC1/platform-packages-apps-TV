@@ -16,17 +16,20 @@
 
 package com.android.tv.dvr.ui.list;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.drawable.Drawable;
-import android.media.tv.TvInputInfo;
+import android.content.res.Resources;
+import android.os.Build;
+import android.support.annotation.IntDef;
 import android.support.v17.leanback.widget.RowPresenter;
 import android.text.TextUtils;
-import android.util.ArraySet;
-import android.util.Range;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.View.OnFocusChangeListener;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
@@ -37,140 +40,137 @@ import android.widget.Toast;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
+import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
+import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.DvrScheduleManager;
 import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.dvr.ui.DvrStopRecordingFragment;
+import com.android.tv.dvr.ui.HalfSizedDialogFragment;
+import com.android.tv.util.ToastUtils;
 import com.android.tv.util.Utils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
  * A RowPresenter for {@link ScheduleRow}.
  */
+@TargetApi(Build.VERSION_CODES.N)
 public class ScheduleRowPresenter extends RowPresenter {
-    private Context mContext;
-    private Set<ScheduleRowClickListener> mListeners = new ArraySet<>();
-    private final Drawable mBeingRecordedDrawable;
+    private static final String TAG = "ScheduleRowPresenter";
 
-    private final Map<String, HashMap<Long, ScheduledRecording>> mInputScheduleMap = new
-            HashMap<>();
-    private final List<ScheduledRecording> mConflicts = new ArrayList<>();
-    // TODO: Handle input schedule map and conflicts info in the adapter.
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({ACTION_START_RECORDING, ACTION_STOP_RECORDING, ACTION_CREATE_SCHEDULE,
+            ACTION_REMOVE_SCHEDULE})
+    public @interface ScheduleRowAction {}
+    /** An action to start recording. */
+    public static final int ACTION_START_RECORDING = 1;
+    /** An action to stop recording. */
+    public static final int ACTION_STOP_RECORDING = 2;
+    /** An action to create schedule for the row. */
+    public static final int ACTION_CREATE_SCHEDULE = 3;
+    /** An action to remove the schedule. */
+    public static final int ACTION_REMOVE_SCHEDULE = 4;
 
-    private final Drawable mOnAirDrawable;
-    private final Drawable mCancelDrawable;
-    private final Drawable mScheduleDrawable;
+    private final Context mContext;
+    private final DvrManager mDvrManager;
+    private final DvrScheduleManager mDvrScheduleManager;
 
     private final String mTunerConflictWillNotBeRecordedInfo;
     private final String mTunerConflictWillBePartiallyRecordedInfo;
-    private final String mInfoSeparator;
+    private final int mAnimationDuration;
+
+    private int mLastFocusedViewId;
 
     /**
      * A ViewHolder for {@link ScheduleRow}
      */
     public static class ScheduleRowViewHolder extends RowPresenter.ViewHolder {
+        private ScheduleRowPresenter mPresenter;
+        @ScheduleRowAction private int[] mActions;
         private boolean mLtr;
         private LinearLayout mInfoContainer;
-        private RelativeLayout mScheduleActionContainer;
-        private RelativeLayout mDeleteActionContainer;
+        // The first action is on the right of the second action.
+        private RelativeLayout mSecondActionContainer;
+        private RelativeLayout mFirstActionContainer;
         private View mSelectorView;
         private TextView mTimeView;
         private TextView mProgramTitleView;
         private TextView mInfoSeparatorView;
         private TextView mChannelNameView;
         private TextView mConflictInfoView;
-        private ImageView mScheduleActionView;
-        private ImageView mDeleteActionView;
+        private ImageView mSecondActionView;
+        private ImageView mFirstActionView;
 
-        private ScheduledRecording mRecording;
+        private Runnable mPendingAnimationRunnable;
 
-        public ScheduleRowViewHolder(View view) {
+        private final int mSelectorTranslationDelta;
+        private final int mSelectorWidthDelta;
+        private final int mInfoContainerTargetWidthWithNoAction;
+        private final int mInfoContainerTargetWidthWithOneAction;
+        private final int mInfoContainerTargetWidthWithTwoAction;
+        private final int mRoundRectRadius;
+
+        private final OnFocusChangeListener mOnFocusChangeListener =
+                new View.OnFocusChangeListener() {
+                    @Override
+                    public void onFocusChange(View view, boolean focused) {
+                        view.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (view.isFocused()) {
+                                    mPresenter.mLastFocusedViewId = view.getId();
+                                }
+                                updateSelector();
+                            }
+                        });
+                    }
+                };
+
+        public ScheduleRowViewHolder(View view, ScheduleRowPresenter presenter) {
             super(view);
+            mPresenter = presenter;
             mLtr = view.getContext().getResources().getConfiguration().getLayoutDirection()
                     == View.LAYOUT_DIRECTION_LTR;
             mInfoContainer = (LinearLayout) view.findViewById(R.id.info_container);
-            mScheduleActionContainer = (RelativeLayout) view.findViewById(
-                    R.id.action_schedule_container);
-            mScheduleActionView = (ImageView) view.findViewById(R.id.action_schedule);
-            mDeleteActionContainer = (RelativeLayout) view.findViewById(
-                    R.id.action_delete_container);
-            mDeleteActionView = (ImageView) view.findViewById(R.id.action_delete);
+            mSecondActionContainer = (RelativeLayout) view.findViewById(
+                    R.id.action_second_container);
+            mSecondActionView = (ImageView) view.findViewById(R.id.action_second);
+            mFirstActionContainer = (RelativeLayout) view.findViewById(
+                    R.id.action_first_container);
+            mFirstActionView = (ImageView) view.findViewById(R.id.action_first);
             mSelectorView = view.findViewById(R.id.selector);
             mTimeView = (TextView) view.findViewById(R.id.time);
             mProgramTitleView = (TextView) view.findViewById(R.id.program_title);
             mInfoSeparatorView = (TextView) view.findViewById(R.id.info_separator);
             mChannelNameView = (TextView) view.findViewById(R.id.channel_name);
             mConflictInfoView = (TextView) view.findViewById(R.id.conflict_info);
+            Resources res = view.getResources();
+            mSelectorTranslationDelta =
+                    res.getDimensionPixelSize(R.dimen.dvr_schedules_item_section_margin)
+                    - res.getDimensionPixelSize(R.dimen.dvr_schedules_item_focus_translation_delta);
+            mSelectorWidthDelta = res.getDimensionPixelSize(
+                    R.dimen.dvr_schedules_item_focus_width_delta);
+            mRoundRectRadius = res.getDimensionPixelSize(R.dimen.dvr_schedules_selector_radius);
+            int fullWidth = res.getDimensionPixelSize(
+                    R.dimen.dvr_schedules_item_width)
+                    - 2 * res.getDimensionPixelSize(R.dimen.dvr_schedules_layout_padding);
+            mInfoContainerTargetWidthWithNoAction = fullWidth + 2 * mRoundRectRadius;
+            mInfoContainerTargetWidthWithOneAction = fullWidth
+                    - res.getDimensionPixelSize(R.dimen.dvr_schedules_item_section_margin)
+                    - res.getDimensionPixelSize(R.dimen.dvr_schedules_item_delete_width)
+                    + mRoundRectRadius + mSelectorWidthDelta;
+            mInfoContainerTargetWidthWithTwoAction = mInfoContainerTargetWidthWithOneAction
+                    - res.getDimensionPixelSize(R.dimen.dvr_schedules_item_section_margin)
+                    - res.getDimensionPixelSize(R.dimen.dvr_schedules_item_icon_size);
 
-            mInfoContainer.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean focused) {
-                    view.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateSelector();
-                        }
-                    });
-                }
-            });
-
-            mDeleteActionContainer.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean focused) {
-                    view.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateSelector();
-                        }
-                    });
-                }
-            });
-
-            mScheduleActionContainer.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-                @Override
-                public void onFocusChange(View view, boolean focused) {
-                    view.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateSelector();
-                        }
-                    });
-                }
-            });
-        }
-
-        /**
-         * Sets scheduled recording.
-         */
-        public void setRecording(ScheduledRecording recording) {
-            mRecording = recording;
-        }
-
-        /**
-         * Returns Info container.
-         */
-        public LinearLayout getInfoContainer() {
-            return mInfoContainer;
-        }
-
-        /**
-         * Returns schedule action container.
-         */
-        public RelativeLayout getScheduleActionContainer() {
-            return mScheduleActionContainer;
-        }
-
-        /**
-         * Returns delete action container.
-         */
-        public RelativeLayout getDeleteActionContainer() {
-            return mDeleteActionContainer;
+            mInfoContainer.setOnFocusChangeListener(mOnFocusChangeListener);
+            mFirstActionContainer.setOnFocusChangeListener(mOnFocusChangeListener);
+            mSecondActionContainer.setOnFocusChangeListener(mOnFocusChangeListener);
         }
 
         /**
@@ -187,92 +187,55 @@ public class ScheduleRowPresenter extends RowPresenter {
             return mProgramTitleView;
         }
 
-        /**
-         * Returns subtitle view.
-         */
-        public TextView getChannelNameView() {
-            return mChannelNameView;
-        }
-
-        /**
-         * Returns conflict information view.
-         */
-        public TextView getConflictInfoView() {
-            return mConflictInfoView;
-        }
-
-        /**
-         * Returns schedule action view.
-         */
-        public ImageView getScheduleActionView() {
-            return mScheduleActionView;
-        }
-
-        /**
-         * Returns delete action view.
-         */
-        public ImageView getDeleteActionView() {
-            return mDeleteActionView;
-        }
-
-        /**
-         * Returns scheduled recording.
-         */
-        public ScheduledRecording getRecording() {
-            return mRecording;
-        }
-
         private void updateSelector() {
-            // TODO: Support RTL language
             int animationDuration = mSelectorView.getResources().getInteger(
                     android.R.integer.config_shortAnimTime);
             DecelerateInterpolator interpolator = new DecelerateInterpolator();
-            int roundRectRadius = view.getResources().getDimensionPixelSize(
-                    R.dimen.dvr_schedules_selector_radius);
 
-            if (mInfoContainer.isFocused() || mScheduleActionContainer.isFocused()
-                    || mDeleteActionContainer.isFocused()) {
+            if (mInfoContainer.isFocused() || mSecondActionContainer.isFocused()
+                    || mFirstActionContainer.isFocused()) {
                 final ViewGroup.LayoutParams lp = mSelectorView.getLayoutParams();
                 final int targetWidth;
                 if (mInfoContainer.isFocused()) {
-                    if (mScheduleActionContainer.getVisibility() == View.GONE
-                            && mDeleteActionContainer.getVisibility() == View.GONE) {
-                        targetWidth = mInfoContainer.getWidth() + 2 * roundRectRadius;
+                    // Use actions to check the visibility of the actions instead of calling
+                    // View.getVisibility() because the view could be on the hiding animation.
+                    if (mActions == null || mActions.length == 0) {
+                        targetWidth = mInfoContainerTargetWidthWithNoAction;
+                    } else if (mActions.length == 1) {
+                        targetWidth = mInfoContainerTargetWidthWithOneAction;
                     } else {
-                        targetWidth = mInfoContainer.getWidth() + roundRectRadius;
+                        targetWidth = mInfoContainerTargetWidthWithTwoAction;
                     }
-                } else if (mScheduleActionContainer.isFocused()) {
-                    if (mScheduleActionContainer.getWidth() > 2 * roundRectRadius) {
-                        targetWidth = mScheduleActionContainer.getWidth();
-                    } else {
-                        targetWidth = 2 * roundRectRadius;
-                    }
+                } else if (mSecondActionContainer.isFocused()) {
+                    targetWidth = Math.max(mSecondActionContainer.getWidth(), 2 * mRoundRectRadius);
                 } else {
-                    targetWidth = mDeleteActionContainer.getWidth() + roundRectRadius;
+                    targetWidth = mFirstActionContainer.getWidth() + mRoundRectRadius
+                            + mSelectorTranslationDelta;
                 }
 
                 float targetTranslationX;
                 if (mInfoContainer.isFocused()) {
-                    targetTranslationX = mLtr ? mInfoContainer.getLeft() - roundRectRadius
+                    targetTranslationX = mLtr ? mInfoContainer.getLeft() - mRoundRectRadius
                             - mSelectorView.getLeft() :
-                            mInfoContainer.getRight() + roundRectRadius - mInfoContainer.getRight();
-                } else if (mScheduleActionContainer.isFocused()) {
-                    if (mScheduleActionContainer.getWidth() > 2 * roundRectRadius) {
-                        targetTranslationX = mLtr ? mScheduleActionContainer.getLeft() -
+                            mInfoContainer.getRight() + mRoundRectRadius - mSelectorView.getRight();
+                } else if (mSecondActionContainer.isFocused()) {
+                    if (mSecondActionContainer.getWidth() > 2 * mRoundRectRadius) {
+                        targetTranslationX = mLtr ? mSecondActionContainer.getLeft() -
                                 mSelectorView.getLeft()
-                                : mScheduleActionContainer.getRight() - mSelectorView.getRight();
+                                : mSecondActionContainer.getRight() - mSelectorView.getRight();
                     } else {
-                        targetTranslationX = mLtr ? mScheduleActionContainer.getLeft() -
-                                (roundRectRadius - mScheduleActionContainer.getWidth() / 2) -
+                        targetTranslationX = mLtr ? mSecondActionContainer.getLeft() -
+                                (mRoundRectRadius - mSecondActionContainer.getWidth() / 2) -
                                 mSelectorView.getLeft()
-                                : mScheduleActionContainer.getRight() +
-                                (roundRectRadius - mScheduleActionContainer.getWidth() / 2) -
+                                : mSecondActionContainer.getRight() +
+                                (mRoundRectRadius - mSecondActionContainer.getWidth() / 2) -
                                 mSelectorView.getRight();
                     }
                 } else {
-                    targetTranslationX = mLtr ? mDeleteActionContainer.getLeft()
-                            - mSelectorView.getLeft()
-                            : mDeleteActionContainer.getRight() - mSelectorView.getRight();
+                    targetTranslationX = mLtr ? mFirstActionContainer.getLeft()
+                            - mSelectorTranslationDelta - mSelectorView.getLeft()
+                            : mFirstActionContainer.getRight() + mSelectorTranslationDelta
+                            - mSelectorView.getRight();
                 }
 
                 if (mSelectorView.getAlpha() == 0) {
@@ -294,10 +257,14 @@ public class ScheduleRowPresenter extends RowPresenter {
                                 mSelectorView.requestLayout();
                             }
                         }).setDuration(animationDuration).setInterpolator(interpolator).start();
+                if (mPendingAnimationRunnable != null) {
+                    mPendingAnimationRunnable.run();
+                    mPendingAnimationRunnable = null;
+                }
             } else {
                 mSelectorView.animate().cancel();
                 mSelectorView.animate().alpha(0f).setDuration(animationDuration)
-                        .setInterpolator(interpolator).start();
+                        .setInterpolator(interpolator).setUpdateListener(null).start();
             }
         }
 
@@ -338,23 +305,20 @@ public class ScheduleRowPresenter extends RowPresenter {
         setHeaderPresenter(null);
         setSelectEffectEnabled(false);
         mContext = context;
-        mBeingRecordedDrawable = mContext.getDrawable(R.drawable.ic_record_stop);
-        mOnAirDrawable = mContext.getDrawable(R.drawable.ic_record_start);
-        mCancelDrawable = mContext.getDrawable(R.drawable.ic_dvr_cancel);
-        mScheduleDrawable = mContext.getDrawable(R.drawable.ic_scheduled_recording);
+        mDvrManager = TvApplication.getSingletons(context).getDvrManager();
+        mDvrScheduleManager = TvApplication.getSingletons(context).getDvrScheduleManager();
         mTunerConflictWillNotBeRecordedInfo = mContext.getString(
                 R.string.dvr_schedules_tuner_conflict_will_not_be_recorded_info);
         mTunerConflictWillBePartiallyRecordedInfo = mContext.getString(
                 R.string.dvr_schedules_tuner_conflict_will_be_partially_recorded);
-        mInfoSeparator = mContext.getString(R.string.dvr_schedules_information_separator);
-        updateInputScheduleMap();
+        mAnimationDuration = mContext.getResources().getInteger(
+                android.R.integer.config_shortAnimTime);
     }
 
     @Override
     public ViewHolder createRowViewHolder(ViewGroup parent) {
-        View view = LayoutInflater.from(mContext).inflate(R.layout.dvr_schedules_item,
-                parent, false);
-        return onGetScheduleRowViewHolder(view);
+        return onGetScheduleRowViewHolder(LayoutInflater.from(mContext)
+                .inflate(R.layout.dvr_schedules_item, parent, false));
     }
 
     /**
@@ -365,396 +329,467 @@ public class ScheduleRowPresenter extends RowPresenter {
     }
 
     /**
-     * Returns be recorded drawable which is for being recorded scheduled recordings.
+     * Returns DVR manager.
      */
-    protected Drawable getBeingRecordedDrawable() {
-        return mBeingRecordedDrawable;
-    }
-
-    /**
-     * Returns on air drawable which is for on air but not being recorded scheduled recordings.
-     */
-    protected Drawable getOnAirDrawable() {
-        return mOnAirDrawable;
-    }
-
-    /**
-     * Returns cancel drawable which is for cancelling scheduled recording.
-     */
-    protected Drawable getCancelDrawable() {
-        return mCancelDrawable;
-    }
-
-    /**
-     * Returns schedule drawable which is for scheduling.
-     */
-    protected Drawable getScheduleDrawable() {
-        return mScheduleDrawable;
-    }
-
-    /**
-     * Returns conflicting scheduled recordings.
-     */
-    protected List<ScheduledRecording> getConflicts() {
-        return mConflicts;
+    protected DvrManager getDvrManager() {
+        return mDvrManager;
     }
 
     @Override
     protected void onBindRowViewHolder(RowPresenter.ViewHolder vh, Object item) {
         super.onBindRowViewHolder(vh, item);
         ScheduleRowViewHolder viewHolder = (ScheduleRowViewHolder) vh;
-        ScheduleRow scheduleRow = (ScheduleRow) item;
-        ScheduledRecording recording = scheduleRow.getRecording();
-        // TODO: Do not show separator in the first row.
+        ScheduleRow row = (ScheduleRow) item;
+        @ScheduleRowAction int[] actions = getAvailableActions(row);
+        viewHolder.mActions = actions;
         viewHolder.mInfoContainer.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                onInfoClicked(scheduleRow);
+                onInfoClicked(row);
             }
         });
 
-        viewHolder.mDeleteActionContainer.setOnClickListener(new View.OnClickListener() {
+        viewHolder.mFirstActionContainer.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                onDeleteClicked(scheduleRow, viewHolder);
+                onActionClicked(actions[0], row);
             }
         });
 
-        viewHolder.mScheduleActionContainer.setOnClickListener(new View.OnClickListener() {
+        viewHolder.mSecondActionContainer.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                onScheduleClicked(scheduleRow);
+                onActionClicked(actions[1], row);
             }
         });
 
-        viewHolder.mTimeView.setText(onGetRecordingTimeText(recording));
-        Channel channel = TvApplication.getSingletons(mContext).getChannelDataManager()
-                .getChannel(recording.getChannelId());
-        String programInfoText = onGetProgramInfoText(recording);
+        viewHolder.mTimeView.setText(onGetRecordingTimeText(row));
+        String programInfoText = onGetProgramInfoText(row);
         if (TextUtils.isEmpty(programInfoText)) {
             int durationMins =
-                    Math.max((int) TimeUnit.MILLISECONDS.toMinutes(recording.getDuration()), 1);
+                    Math.max((int) TimeUnit.MILLISECONDS.toMinutes(row.getDuration()), 1);
             programInfoText = mContext.getResources().getQuantityString(
                     R.plurals.dvr_schedules_recording_duration, durationMins, durationMins);
         }
-        String channelName = channel != null ? channel.getDisplayName() : null;
+        String channelName = getChannelNameText(row);
         viewHolder.mProgramTitleView.setText(programInfoText);
         viewHolder.mInfoSeparatorView.setVisibility((!TextUtils.isEmpty(programInfoText)
                 && !TextUtils.isEmpty(channelName)) ? View.VISIBLE : View.GONE);
         viewHolder.mChannelNameView.setText(channelName);
-        if (!scheduleRow.isRemoveScheduleChecked()) {
-            if (recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                viewHolder.mDeleteActionView.setImageDrawable(mBeingRecordedDrawable);
-            } else {
-                viewHolder.mDeleteActionView.setImageDrawable(mCancelDrawable);
+        if (actions != null) {
+            switch (actions.length) {
+                case 2:
+                    viewHolder.mSecondActionView.setImageResource(getImageForAction(actions[1]));
+                    // pass through
+                case 1:
+                    viewHolder.mFirstActionView.setImageResource(getImageForAction(actions[0]));
+                    break;
             }
-        } else {
-            if (recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                viewHolder.mDeleteActionView.setImageDrawable(mOnAirDrawable);
-            } else {
-                viewHolder.mDeleteActionView.setImageDrawable(mScheduleDrawable);
-            }
-            viewHolder.mProgramTitleView.setTextColor(
-                    mContext.getResources().getColor(R.color.dvr_schedules_item_info, null));
         }
-        viewHolder.mRecording = recording;
-        onBindRowViewHolderInternal(viewHolder, scheduleRow);
+        if (mDvrManager.isConflicting(row.getSchedule())) {
+            String conflictInfo;
+            if (mDvrScheduleManager.isPartiallyConflicting(row.getSchedule())) {
+                conflictInfo = mTunerConflictWillBePartiallyRecordedInfo;
+            } else {
+                conflictInfo = mTunerConflictWillNotBeRecordedInfo;
+            }
+            viewHolder.mConflictInfoView.setText(conflictInfo);
+            viewHolder.mConflictInfoView.setVisibility(View.VISIBLE);
+        } else {
+            viewHolder.mConflictInfoView.setVisibility(View.GONE);
+        }
+        if (shouldBeGrayedOut(row)) {
+            viewHolder.greyOutInfo();
+        } else {
+            viewHolder.whiteBackInfo();
+        }
+        updateActionContainer(viewHolder, viewHolder.isSelected());
+    }
+
+    private int getImageForAction(@ScheduleRowAction int action) {
+        switch (action) {
+            case ACTION_START_RECORDING:
+                return R.drawable.ic_record_start;
+            case ACTION_STOP_RECORDING:
+                return R.drawable.ic_record_stop;
+            case ACTION_CREATE_SCHEDULE:
+                return R.drawable.ic_scheduled_recording;
+            case ACTION_REMOVE_SCHEDULE:
+                return R.drawable.ic_dvr_cancel;
+            default:
+                return 0;
+        }
     }
 
     /**
      * Returns view holder for schedule row.
      */
     protected ScheduleRowViewHolder onGetScheduleRowViewHolder(View view) {
-        return new ScheduleRowViewHolder(view);
+        return new ScheduleRowViewHolder(view, this);
     }
 
     /**
      * Returns time text for time view from scheduled recording.
      */
-    protected String onGetRecordingTimeText(ScheduledRecording recording) {
-        return Utils.getDurationString(mContext, recording.getStartTimeMs(),
-                recording.getEndTimeMs(), true, false, true, 0);
+    protected String onGetRecordingTimeText(ScheduleRow row) {
+        return Utils.getDurationString(mContext, row.getStartTimeMs(), row.getEndTimeMs(), true,
+                false, true, 0);
     }
 
     /**
      * Returns program info text for program title view.
      */
-    protected String onGetProgramInfoText(ScheduledRecording recording) {
-        if (recording != null) {
-            return recording.getProgramTitle();
-        }
-        return null;
+    protected String onGetProgramInfoText(ScheduleRow row) {
+        return row.getProgramTitleWithEpisodeNumber(mContext);
     }
 
-    /**
-     * Internal method for onBindRowViewHolder, can be customized by subclass.
-     */
-    protected void onBindRowViewHolderInternal(ScheduleRowViewHolder viewHolder, ScheduleRow
-            scheduleRow) {
-        if (mConflicts.contains(scheduleRow.getRecording())) {
-            viewHolder.mScheduleActionView.setImageDrawable(mScheduleDrawable);
-            String conflictInfo = mTunerConflictWillNotBeRecordedInfo;
-            // TODO: It's also possible for the NonStarted schedules to be partially recorded.
-            if (viewHolder.mRecording.getState()
-                    == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                conflictInfo = mTunerConflictWillBePartiallyRecordedInfo;
-            }
-            viewHolder.mConflictInfoView.setText(conflictInfo);
-            // TODO: Add 12dp warning icon to conflict info.
-            viewHolder.mConflictInfoView.setVisibility(View.VISIBLE);
-            viewHolder.greyOutInfo();
-        } else {
-            viewHolder.mScheduleActionContainer.setVisibility(View.GONE);
-            viewHolder.mConflictInfoView.setVisibility(View.GONE);
-            if (!scheduleRow.isRemoveScheduleChecked()) {
-                viewHolder.whiteBackInfo();
-            }
-        }
-    }
-
-    /**
-     * Updates input schedule map.
-     */
-    private void updateInputScheduleMap() {
-        mInputScheduleMap.clear();
-        List<ScheduledRecording> allRecordings = TvApplication.getSingletons(getContext())
-                .getDvrDataManager().getAvailableScheduledRecordings();
-        for(ScheduledRecording recording : allRecordings) {
-            addScheduledRecordingToMap(recording);
-        }
-        updateConflicts();
-    }
-
-    /**
-     * Updates conflicting scheduled recordings.
-     */
-    private void updateConflicts() {
-        mConflicts.clear();
-        for (String inputId : mInputScheduleMap.keySet()) {
-            TvInputInfo input = Utils.getTvInputInfoForInputId(mContext, inputId);
-            if (input == null) {
-                continue;
-            }
-            mConflicts.addAll(DvrScheduleManager.getConflictingSchedules(
-                    new ArrayList<>(mInputScheduleMap.get(inputId).values()),
-                    input.getTunerCount()));
-        }
-    }
-
-    /**
-     * Adds a scheduled recording to the map, it happens when user undo cancel.
-     */
-    private void addScheduledRecordingToMap(ScheduledRecording recording) {
-        TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext,
-                recording.getChannelId());
-        if (input == null) {
-            return;
-        }
-        String inputId = input.getId();
-        HashMap<Long, ScheduledRecording> schedulesMap = mInputScheduleMap.get(inputId);
-        if (schedulesMap == null) {
-            schedulesMap = new HashMap<>();
-            mInputScheduleMap.put(inputId, schedulesMap);
-        }
-        schedulesMap.put(recording.getId(), recording);
-    }
-
-    /**
-     * Called when a scheduled recording is added into dvr date manager.
-     */
-    public void onScheduledRecordingAdded(ScheduledRecording recording) {
-        if (recording.getState() == ScheduledRecording.STATE_RECORDING_NOT_STARTED || recording
-                .getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-            addScheduledRecordingToMap(recording);
-            updateConflicts();
-        }
-    }
-
-    /**
-     * Adds a scheduled recording to the map, it happens when user undo cancel.
-     */
-    private void updateScheduledRecordingToMap(ScheduledRecording recording) {
-        if (recording.getState() == ScheduledRecording.STATE_RECORDING_NOT_STARTED ||
-                recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-            TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext,
-                    recording.getChannelId());
-            if (input == null) {
-                return;
-            }
-            String inputId = input.getId();
-            HashMap<Long, ScheduledRecording> schedulesMap = mInputScheduleMap.get(inputId);
-            if (schedulesMap == null) {
-                addScheduledRecordingToMap(recording);
-                return;
-            }
-            schedulesMap.put(recording.getId(), recording);
-        } else {
-            removeScheduledRecordingFromMap(recording);
-        }
-    }
-
-    /**
-     * Called when a scheduled recording is updated in dvr date manager.
-     */
-    public void onScheduledRecordingUpdated(ScheduledRecording recording) {
-        updateScheduledRecordingToMap(recording);
-        updateConflicts();
-    }
-
-    /**
-     * Removes a scheduled recording from the map, it happens when user cancel schedule.
-     */
-    private void removeScheduledRecordingFromMap(ScheduledRecording recording) {
-        TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext, recording.getChannelId());
-        if (input == null) {
-            return;
-        }
-        String inputId = input.getId();
-        HashMap<Long, ScheduledRecording> schedulesMap = mInputScheduleMap.get(inputId);
-        if (schedulesMap == null) {
-            return;
-        }
-        schedulesMap.remove(recording.getId());
-        if (schedulesMap.isEmpty()) {
-            mInputScheduleMap.remove(inputId);
-        }
-    }
-
-    /**
-     * Called when a scheduled recording is removed from dvr date manager.
-     */
-    public void onScheduledRecordingRemoved(ScheduledRecording recording) {
-        removeScheduledRecordingFromMap(recording);
-        updateConflicts();
+    private String getChannelNameText(ScheduleRow row) {
+        Channel channel = TvApplication.getSingletons(mContext).getChannelDataManager()
+                .getChannel(row.getChannelId());
+        return channel == null ? null :
+                TextUtils.isEmpty(channel.getDisplayName()) ? channel.getDisplayNumber() :
+                        channel.getDisplayName().trim() + " " + channel.getDisplayNumber();
     }
 
     /**
      * Called when user click Info in {@link ScheduleRow}.
      */
     protected void onInfoClicked(ScheduleRow scheduleRow) {
-        DvrUiHelper.startDetailsActivity((Activity) mContext,
-                scheduleRow.getRecording(), null, true);
+        ScheduledRecording schedule = scheduleRow.getSchedule();
+        if (schedule != null) {
+            DvrUiHelper.startDetailsActivity((Activity) mContext, schedule, null, true);
+        }
     }
 
     /**
-     * Called when user click schedule in {@link ScheduleRow}.
+     * Called when the button in a row is clicked.
      */
-    protected void onScheduleClicked(ScheduleRow scheduleRow) {
-        ScheduledRecording scheduledRecording = scheduleRow.getRecording();
-        TvInputInfo input = Utils.getTvInputInfoForChannelId(mContext,
-                scheduledRecording.getChannelId());
-        if (input == null) {
+    protected void onActionClicked(@ScheduleRowAction final int action, ScheduleRow row) {
+        switch (action) {
+            case ACTION_START_RECORDING:
+                onStartRecording(row);
+                break;
+            case ACTION_STOP_RECORDING:
+                onStopRecording(row);
+                break;
+            case ACTION_CREATE_SCHEDULE:
+                onCreateSchedule(row);
+                break;
+            case ACTION_REMOVE_SCHEDULE:
+                onRemoveSchedule(row);
+                break;
+        }
+    }
+
+    /**
+     * Action handler for {@link #ACTION_START_RECORDING}.
+     */
+    protected void onStartRecording(ScheduleRow row) {
+        ScheduledRecording schedule = row.getSchedule();
+        if (schedule == null) {
+            // This row has been deleted.
             return;
         }
-        List<ScheduledRecording> allScheduledRecordings = new ArrayList<ScheduledRecording>(
-                mInputScheduleMap.get(input.getId()).values());
-        long maxPriority = scheduledRecording.getPriority();
-        for (ScheduledRecording recording : allScheduledRecordings) {
-            if (scheduledRecording.isOverLapping(
-                    new Range<>(recording.getStartTimeMs(), recording.getEndTimeMs()))) {
-                if (maxPriority < recording.getPriority()) {
-                    maxPriority = recording.getPriority();
-                }
+        // Checks if there are current recordings that will be stopped by schedule this program.
+        // If so, shows confirmation dialog to users.
+        List<ScheduledRecording> conflictSchedules = mDvrScheduleManager.getConflictingSchedules(
+                schedule.getChannelId(), System.currentTimeMillis(), schedule.getEndTimeMs());
+        for (int i = conflictSchedules.size() - 1; i >= 0; i--) {
+            ScheduledRecording conflictSchedule = conflictSchedules.get(i);
+            if (conflictSchedule.isInProgress()) {
+                DvrUiHelper.showStopRecordingDialog((Activity) mContext,
+                        conflictSchedule.getChannelId(),
+                        DvrStopRecordingFragment.REASON_ON_CONFLICT,
+                        new HalfSizedDialogFragment.OnActionClickListener() {
+                            @Override
+                            public void onActionClick(long actionId) {
+                                if (actionId == DvrStopRecordingFragment.ACTION_STOP) {
+                                    onStartRecordingInternal(row);
+                                }
+                            }
+                        });
+                return;
             }
         }
-        TvApplication.getSingletons(getContext()).getDvrManager()
-                .updateScheduledRecording(ScheduledRecording.buildFrom(scheduledRecording)
-                .setPriority(maxPriority + 1).build());
-        updateConflicts();
+        onStartRecordingInternal(row);
+    }
+
+    private void onStartRecordingInternal(ScheduleRow row) {
+        if (row.isOnAir() && !row.isRecordingInProgress() && !row.isStartRecordingRequested()) {
+            row.setStartRecordingRequested(true);
+            if (row.isRecordingNotStarted()) {
+                mDvrManager.setHighestPriority(row.getSchedule());
+            } else if (row.isRecordingFinished()) {
+                mDvrManager.addSchedule(ScheduledRecording.buildFrom(row.getSchedule())
+                        .setId(ScheduledRecording.ID_NOT_SET)
+                        .setState(ScheduledRecording.STATE_RECORDING_NOT_STARTED)
+                        .setPriority(mDvrManager.suggestHighestPriority(row.getSchedule()))
+                        .build());
+            } else {
+                SoftPreconditions.checkState(false, TAG, "Invalid row state to start recording: "
+                        + row);
+                return;
+            }
+            String msg = mContext.getString(R.string.dvr_msg_current_program_scheduled,
+                    row.getSchedule().getProgramTitle(),
+                    Utils.toTimeString(row.getEndTimeMs(), false));
+            ToastUtils.show(mContext, msg, Toast.LENGTH_SHORT);
+        }
     }
 
     /**
-     * Called when user click delete in {@link ScheduleRow}.
+     * Action handler for {@link #ACTION_STOP_RECORDING}.
      */
-    protected void onDeleteClicked(ScheduleRow scheduleRow, ViewHolder vh) {
-        ScheduledRecording recording = scheduleRow.getRecording();
-        ScheduleRowViewHolder viewHolder = (ScheduleRowViewHolder) vh;
-        if (!scheduleRow.isRemoveScheduleChecked()) {
-            if (mConflicts.contains(recording)) {
-                TvApplication.getSingletons(mContext)
-                        .getDvrManager().removeScheduledRecording(recording);
-            }
-
-            if (recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                viewHolder.mDeleteActionView.setImageDrawable(mOnAirDrawable);
-                // TODO: Replace an icon whose size is the same as scheudle.
-            } else {
-                viewHolder.getDeleteActionView().setImageDrawable(mScheduleDrawable);
-            }
-            viewHolder.greyOutInfo();
-            scheduleRow.setRemoveScheduleChecked(true);
-            CharSequence deletedInfo = viewHolder.getProgramTitleView().getText();
+    protected void onStopRecording(ScheduleRow row) {
+        if (row.getSchedule() == null) {
+            // This row has been deleted.
+            return;
+        }
+        if (row.isOnAir() && row.isRecordingInProgress() && !row.isStopRecordingRequested()) {
+            row.setStopRecordingRequested(true);
+            mDvrManager.stopRecording(row.getSchedule());
+            CharSequence deletedInfo = onGetProgramInfoText(row);
             if (TextUtils.isEmpty(deletedInfo)) {
-                deletedInfo = viewHolder.getChannelNameView().getText();
+                deletedInfo = getChannelNameText(row);
             }
-            Toast.makeText(mContext, mContext.getResources()
+            ToastUtils.show(mContext, mContext.getResources()
                     .getString(R.string.dvr_schedules_deletion_info, deletedInfo),
-                    Toast.LENGTH_SHORT).show();
-            removeScheduledRecordingFromMap(recording);
-        } else {
-            if (recording.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-                viewHolder.mDeleteActionView.setImageDrawable(mBeingRecordedDrawable);
-                // TODO: Replace an icon whose size is the same as scheudle.
-            } else {
-                viewHolder.getDeleteActionView().setImageDrawable(mCancelDrawable);
+                    Toast.LENGTH_SHORT);
+        }
+    }
+
+    /**
+     * Action handler for {@link #ACTION_CREATE_SCHEDULE}.
+     */
+    protected void onCreateSchedule(ScheduleRow row) {
+        if (row.getSchedule() == null) {
+            // This row has been deleted.
+            return;
+        }
+        if (!row.isOnAir()) {
+            if (row.isScheduleCanceled()) {
+                mDvrManager.updateScheduledRecording(ScheduledRecording.buildFrom(row.getSchedule())
+                        .setState(ScheduledRecording.STATE_RECORDING_NOT_STARTED)
+                        .setPriority(mDvrManager.suggestHighestPriority(row.getSchedule()))
+                        .build());
+                String msg = mContext.getString(R.string.dvr_msg_program_scheduled,
+                        row.getSchedule().getProgramTitle());
+                ToastUtils.show(mContext, msg, Toast.LENGTH_SHORT);
+            } else if (mDvrManager.isConflicting(row.getSchedule())) {
+                mDvrManager.setHighestPriority(row.getSchedule());
             }
-            viewHolder.whiteBackInfo();
-            scheduleRow.setRemoveScheduleChecked(false);
-            addScheduledRecordingToMap(recording);
-        }
-        updateConflicts();
-        for (ScheduleRowClickListener l : mListeners) {
-            l.onDeleteClicked(scheduleRow);
         }
     }
 
     /**
-     * Adds {@link ScheduleRowClickListener}.
+     * Action handler for {@link #ACTION_REMOVE_SCHEDULE}.
      */
-    public void addListener(ScheduleRowClickListener scheduleRowClickListener) {
-        mListeners.add(scheduleRowClickListener);
+    protected void onRemoveSchedule(ScheduleRow row) {
+        if (row.getSchedule() == null) {
+            // This row has been deleted.
+            return;
+        }
+        CharSequence deletedInfo = null;
+        if (row.isOnAir()) {
+            if (row.isRecordingNotStarted()) {
+                deletedInfo = getDeletedInfo(row);
+                mDvrManager.removeScheduledRecording(row.getSchedule());
+            }
+        } else {
+            if (mDvrManager.isConflicting(row.getSchedule())
+                    && !shouldKeepScheduleAfterRemoving()) {
+                deletedInfo = getDeletedInfo(row);
+                mDvrManager.removeScheduledRecording(row.getSchedule());
+            } else if (row.isRecordingNotStarted()) {
+                deletedInfo = getDeletedInfo(row);
+                mDvrManager.updateScheduledRecording(ScheduledRecording.buildFrom(row.getSchedule())
+                        .setState(ScheduledRecording.STATE_RECORDING_CANCELED)
+                        .build());
+            }
+        }
+        if (deletedInfo != null) {
+            ToastUtils.show(mContext, mContext.getResources()
+                            .getString(R.string.dvr_schedules_deletion_info, deletedInfo),
+                    Toast.LENGTH_SHORT);
+        }
     }
 
-    /**
-     * Removes {@link ScheduleRowClickListener}.
-     */
-    public void removeListener(ScheduleRowClickListener
-            scheduleRowClickListener) {
-        mListeners.remove(scheduleRowClickListener);
+    private CharSequence getDeletedInfo(ScheduleRow row) {
+        CharSequence deletedInfo = onGetProgramInfoText(row);
+        if (TextUtils.isEmpty(deletedInfo)) {
+            return getChannelNameText(row);
+        }
+        return deletedInfo;
     }
 
     @Override
     protected void onRowViewSelected(ViewHolder vh, boolean selected) {
         super.onRowViewSelected(vh, selected);
-        onRowViewSelectedInternal(vh, selected);
+        updateActionContainer(vh, selected);
     }
 
     /**
      * Internal method for onRowViewSelected, can be customized by subclass.
      */
-    protected void onRowViewSelectedInternal(ViewHolder vh, boolean selected) {
+    private void updateActionContainer(ViewHolder vh, boolean selected) {
         ScheduleRowViewHolder viewHolder = (ScheduleRowViewHolder) vh;
-        boolean isRecordingConflicting = mConflicts.contains(viewHolder.mRecording);
-        if (selected) {
-            viewHolder.mDeleteActionContainer.setVisibility(View.VISIBLE);
-            if (isRecordingConflicting) {
-                viewHolder.mScheduleActionContainer.setVisibility(View.VISIBLE);
+        viewHolder.mSecondActionContainer.animate().setListener(null).cancel();
+        viewHolder.mFirstActionContainer.animate().setListener(null).cancel();
+        if (selected && viewHolder.mActions != null) {
+            switch (viewHolder.mActions.length) {
+                case 2:
+                    prepareShowActionView(viewHolder.mSecondActionContainer);
+                    prepareShowActionView(viewHolder.mFirstActionContainer);
+                    viewHolder.mPendingAnimationRunnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            showActionView(viewHolder.mSecondActionContainer);
+                            showActionView(viewHolder.mFirstActionContainer);
+                        }
+                    };
+                    break;
+                case 1:
+                    prepareShowActionView(viewHolder.mFirstActionContainer);
+                    viewHolder.mPendingAnimationRunnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            hideActionView(viewHolder.mSecondActionContainer, View.GONE);
+                            showActionView(viewHolder.mFirstActionContainer);
+                        }
+                    };
+                    if (mLastFocusedViewId == R.id.action_second_container) {
+                        mLastFocusedViewId = R.id.info_container;
+                    }
+                    break;
+                case 0:
+                default:
+                    viewHolder.mPendingAnimationRunnable = new Runnable() {
+                        @Override
+                        public void run() {
+                            hideActionView(viewHolder.mSecondActionContainer, View.GONE);
+                            hideActionView(viewHolder.mFirstActionContainer, View.GONE);
+                        }
+                    };
+                    if (mLastFocusedViewId == R.id.action_first_container
+                            || mLastFocusedViewId == R.id.action_second_container) {
+                        mLastFocusedViewId = R.id.info_container;
+                    }
+                    break;
+            }
+            View view = viewHolder.view.findViewById(mLastFocusedViewId);
+            if (view != null && view.getVisibility() == View.VISIBLE) {
+                // When the row is selected, information container gets the initial focus.
+                // To give the focus to the same control as the previous row, we need to call
+                // requestFocus() explicitly.
+                if (view.hasFocus()) {
+                    viewHolder.mPendingAnimationRunnable.run();
+                } else {
+                    view.requestFocus();
+                }
             }
         } else {
-            viewHolder.mDeleteActionContainer.setVisibility(View.GONE);
-            if (isRecordingConflicting) {
-                viewHolder.mScheduleActionContainer.setVisibility(View.GONE);
-            }
+            viewHolder.mPendingAnimationRunnable = null;
+            hideActionView(viewHolder.mFirstActionContainer, View.GONE);
+            hideActionView(viewHolder.mSecondActionContainer, View.GONE);
         }
     }
 
+    private void prepareShowActionView(View view) {
+        if (view.getVisibility() != View.VISIBLE) {
+            view.setAlpha(0.0f);
+        }
+        view.setVisibility(View.VISIBLE);
+    }
+
     /**
-     * A listener for clicking {@link ScheduleRow}.
+     * Add animation when view is visible.
      */
-    public interface ScheduleRowClickListener{
-        /**
-         * To notify other observers that delete button has been clicked.
-         */
-        void onDeleteClicked(ScheduleRow scheduleRow);
+    private void showActionView(View view) {
+        view.animate().alpha(1.0f).setInterpolator(new DecelerateInterpolator())
+                .setDuration(mAnimationDuration).start();
+    }
+
+    /**
+     * Add animation when view change to invisible.
+     */
+    private void hideActionView(View view, int visibility) {
+        if (view.getVisibility() != View.VISIBLE) {
+            if (view.getVisibility() != visibility) {
+                view.setVisibility(visibility);
+            }
+            return;
+        }
+        view.animate().alpha(0.0f).setInterpolator(new DecelerateInterpolator())
+                .setDuration(mAnimationDuration)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        view.setVisibility(visibility);
+                        view.animate().setListener(null);
+                    }
+                }).start();
+    }
+
+    /**
+     * Returns the available actions according to the row's state. It should be the reverse order
+     * with that in the screen.
+     */
+    @ScheduleRowAction
+    protected int[] getAvailableActions(ScheduleRow row) {
+        if (row.getSchedule() != null) {
+            if (row.isOnAir()) {
+                if (row.isRecordingInProgress()) {
+                    return new int[] {ACTION_STOP_RECORDING};
+                } else if (row.isRecordingNotStarted()) {
+                    if (canResolveConflict()) {
+                        // The "START" action can change the conflict states.
+                        return new int[] {ACTION_REMOVE_SCHEDULE, ACTION_START_RECORDING};
+                    } else {
+                        return new int[] {ACTION_REMOVE_SCHEDULE};
+                    }
+                } else if (row.isRecordingFinished()) {
+                    return new int[] {ACTION_START_RECORDING};
+                } else {
+                    SoftPreconditions.checkState(false, TAG, "Invalid row state in checking the"
+                            + " available actions(on air): " + row);
+                }
+            } else {
+                if (row.isScheduleCanceled()) {
+                    return new int[] {ACTION_CREATE_SCHEDULE};
+                } else if (mDvrManager.isConflicting(row.getSchedule()) && canResolveConflict()) {
+                    return new int[] {ACTION_REMOVE_SCHEDULE, ACTION_CREATE_SCHEDULE};
+                } else if (row.isRecordingNotStarted()) {
+                    return new int[] {ACTION_REMOVE_SCHEDULE};
+                } else {
+                    SoftPreconditions.checkState(false, TAG, "Invalid row state in checking the"
+                            + " available actions(future schedule): " + row);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if the conflict can be resolved in this screen.
+     */
+    protected boolean canResolveConflict() {
+        return true;
+    }
+
+    /**
+     * Check if the schedule should be kept after removing it.
+     */
+    protected boolean shouldKeepScheduleAfterRemoving() {
+        return false;
+    }
+
+    /**
+     * Checks if the row should be grayed out.
+     */
+    protected boolean shouldBeGrayedOut(ScheduleRow row) {
+        return row.getSchedule() == null
+                || (row.isOnAir() && !row.isRecordingInProgress())
+                || mDvrManager.isConflicting(row.getSchedule())
+                || row.isScheduleCanceled();
     }
 }

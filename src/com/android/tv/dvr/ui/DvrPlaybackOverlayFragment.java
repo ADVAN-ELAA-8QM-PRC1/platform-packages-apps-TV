@@ -33,6 +33,7 @@ import android.support.v17.leanback.widget.ListRow;
 import android.support.v17.leanback.widget.ListRowPresenter;
 import android.support.v17.leanback.widget.PlaybackControlsRow;
 import android.support.v17.leanback.widget.PlaybackControlsRowPresenter;
+import android.support.v17.leanback.widget.SinglePresenterSelector;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
@@ -42,6 +43,7 @@ import android.util.Log;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
+import com.android.tv.data.BaseProgram;
 import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.dialog.PinDialogFragment;
 import com.android.tv.dvr.DvrDataManager;
@@ -63,7 +65,8 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
     private DvrPlaybackMediaSessionHelper mMediaSessionHelper;
     private DvrPlaybackControlHelper mPlaybackControlHelper;
     private ArrayObjectAdapter mRowsAdapter;
-    private ArrayObjectAdapter mRelatedRecordingsRowAdapter;
+    private SortedArrayAdapter<BaseProgram> mRelatedRecordingsRowAdapter;
+    private DvrPlaybackCardPresenter mRelatedRecordingCardPresenter;
     private DvrDataManager mDvrDataManager;
     private ContentRatingsManager mContentRatingsManager;
     private TvView mTvView;
@@ -108,7 +111,7 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
         mTvView = (TvView) getActivity().findViewById(R.id.dvr_tv_view);
         mBlockScreenView = getActivity().findViewById(R.id.block_screen);
         mMediaSessionHelper = new DvrPlaybackMediaSessionHelper(
-                getActivity(), MEDIA_SESSION_TAG, new DvrPlayer(mTvView));
+                getActivity(), MEDIA_SESSION_TAG, new DvrPlayer(mTvView), this);
         mPlaybackControlHelper = new DvrPlaybackControlHelper(getActivity(), this);
         setUpRows();
         preparePlayback(getActivity().getIntent());
@@ -166,9 +169,10 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
     @Override
     public void onDestroy() {
         if (DEBUG) Log.d(TAG, "onDestroy");
-        super.onDestroy();
         mPlaybackControlHelper.unregisterCallback();
         mMediaSessionHelper.release();
+        mRelatedRecordingCardPresenter.unbindAllViewHolders();
+        super.onDestroy();
     }
 
     /**
@@ -194,6 +198,15 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
         mWindowHeight = windowHeight;
         mWindowAspectRatio = (float) mWindowWidth / mWindowHeight;
         updateAspectRatio(mAppliedAspectRatio);
+    }
+
+    public RecordedProgram getNextEpisode(RecordedProgram program) {
+        int position = mRelatedRecordingsRowAdapter.findInsertPosition(program);
+        if (position == mRelatedRecordingsRowAdapter.size()) {
+            return null;
+        } else {
+            return (RecordedProgram) mRelatedRecordingsRowAdapter.get(position);
+        }
     }
 
     void onMediaControllerUpdated() {
@@ -261,8 +274,8 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
     }
 
     private ListRow getRelatedRecordingsRow() {
-        mRelatedRecordingsRowAdapter =
-                new ArrayObjectAdapter(new DvrPlaybackCardPresenter(getActivity()));
+        mRelatedRecordingCardPresenter = new DvrPlaybackCardPresenter(getActivity());
+        mRelatedRecordingsRowAdapter = new RelatedRecordingsAdapter(mRelatedRecordingCardPresenter);
         HeaderItem header = new HeaderItem(0,
                 getActivity().getString(R.string.dvr_playback_related_recordings));
         return new ListRow(header, mRelatedRecordingsRowAdapter);
@@ -276,5 +289,16 @@ public class DvrPlaybackOverlayFragment extends PlaybackOverlayFragment {
     private long getSeekTimeFromIntent(Intent intent) {
         return intent.getLongExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_SEEK_TIME,
                 TvInputManager.TIME_SHIFT_INVALID_TIME);
+    }
+
+    private class RelatedRecordingsAdapter extends SortedArrayAdapter<BaseProgram> {
+        RelatedRecordingsAdapter(DvrPlaybackCardPresenter presenter) {
+            super(new SinglePresenterSelector(presenter), BaseProgram.EPISODE_COMPARATOR);
+        }
+
+        @Override
+        long getId(BaseProgram item) {
+            return item.getId();
+        }
     }
 }

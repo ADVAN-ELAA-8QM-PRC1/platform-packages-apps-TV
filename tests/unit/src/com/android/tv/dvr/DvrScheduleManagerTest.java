@@ -25,8 +25,10 @@ import com.android.tv.testing.dvr.RecordingTestUtils;
 import junit.framework.TestCase;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Tests for {@link DvrScheduleManager}
@@ -275,8 +277,8 @@ public class DvrScheduleManagerTest extends TestCase {
         schedules.add(r2);
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1,
                 Collections.singletonList(new Range<>(10L, 20L))), r1);
-        MoreAsserts.assertEmpty(DvrScheduleManager.getConflictingSchedules(schedules, 1,
-                Collections.singletonList(new Range<>(110L, 120L))));
+        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1,
+                Collections.singletonList(new Range<>(110L, 120L))), r1);
     }
 
     public void testGetConflictingSchedules_period2() {
@@ -290,8 +292,8 @@ public class DvrScheduleManagerTest extends TestCase {
         ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
                 ++channelId, ++priority, 100L, 200L);
         schedules.add(r2);
-        MoreAsserts.assertEmpty(DvrScheduleManager.getConflictingSchedules(schedules, 1,
-                Collections.singletonList(new Range<>(10L, 20L))));
+        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1,
+                Collections.singletonList(new Range<>(10L, 20L))), r1);
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1,
                 Collections.singletonList(new Range<>(110L, 120L))), r1);
     }
@@ -337,14 +339,15 @@ public class DvrScheduleManagerTest extends TestCase {
         ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
                 ++channelId, ++priority, 0L, 100L);
         schedules.add(r2);
-        // The result doesn't include r1 because r1 is already canceled when the tuner count is 1.
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(
                 Collections.singletonList(
-                        ScheduledRecording.builder(INPUT_ID, ++channelId, 10L, 20L).build()),
+                        ScheduledRecording.builder(INPUT_ID, ++channelId, 10L, 20L)
+                                .setPriority(++priority).build()),
                 schedules, 1), r2, r1);
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(
                 Collections.singletonList(
-                        ScheduledRecording.builder(INPUT_ID, ++channelId, 110L, 120L).build()),
+                        ScheduledRecording.builder(INPUT_ID, ++channelId, 110L, 120L)
+                                .setPriority(++priority).build()),
                 schedules, 1), r1);
     }
 
@@ -359,33 +362,36 @@ public class DvrScheduleManagerTest extends TestCase {
         ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
                 ++channelId, ++priority, 100L, 200L);
         schedules.add(r2);
-        // The result doesn't include r1 because r1 is already canceled when the tuner count is 1.
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(
                 Collections.singletonList(
-                        ScheduledRecording.builder(INPUT_ID, ++channelId, 10L, 20L).build()),
+                        ScheduledRecording.builder(INPUT_ID, ++channelId, 10L, 20L)
+                                .setPriority(++priority).build()),
                 schedules, 1), r1);
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(
                 Collections.singletonList(
-                        ScheduledRecording.builder(INPUT_ID, ++channelId, 110L, 120L).build()),
+                        ScheduledRecording.builder(INPUT_ID, ++channelId, 110L, 120L)
+                                .setPriority(++priority).build()),
                 schedules, 1), r2, r1);
     }
 
-    public void testGetConflictingSchedules_emptyDuration() {
+    public void testGetConflictingSchedules_addLowestPriority() {
         long priority = 0;
         long channelId = 0;
         List<ScheduledRecording> schedules = new ArrayList<>();
-        schedules.add(RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
-                ++priority, 0L, 200L));
-        // Ignore empty duration.
-        schedules.add(RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
-                ++priority, 0L, 0L));
-        schedules.add(RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
-                ++priority, 100L, 100L));
-        schedules.add(RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
-                ++priority, 200L, 200L));
-        MoreAsserts.assertEmpty(DvrScheduleManager.getConflictingSchedules(schedules, 1));
-        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 0),
-                schedules.get(0));
+
+        ScheduledRecording r1 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 0L, 400L);
+        schedules.add(r1);
+        ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 100L, 200L);
+        schedules.add(r2);
+        // Returning r1 even though r1 has the higher priority than the new one. That's because r1
+        // starts at 0 and stops at 100, and the new one will be recorded successfully.
+        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(
+                Collections.singletonList(
+                        ScheduledRecording.builder(INPUT_ID, ++channelId, 200L, 300L)
+                                .setPriority(0).build()),
+                schedules, 1), r1);
     }
 
     public void testGetConflictingSchedules_sameChannel() {
@@ -396,8 +402,43 @@ public class DvrScheduleManagerTest extends TestCase {
                 ++priority, 0L, 200L));
         schedules.add(RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(channelId,
                 ++priority, 0L, 200L));
-        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 3),
-                schedules.get(0));
+        MoreAsserts.assertEmpty(DvrScheduleManager.getConflictingSchedules(schedules, 3));
+    }
+
+    public void testGetConflictingSchedule_startEarlyAndFail() {
+        long priority = 0;
+        long channelId = 0;
+        List<ScheduledRecording> schedules = new ArrayList<>();
+        ScheduledRecording r1 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 200L, 300L);
+        schedules.add(r1);
+        ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 0L, 400L);
+        schedules.add(r2);
+        ScheduledRecording r3 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 100L, 200L);
+        schedules.add(r3);
+        // r2 starts recording and fails when r3 starts. r1 is recorded successfully.
+        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1),
+                r2);
+    }
+
+    public void testGetConflictingSchedule_startLate() {
+        long priority = 0;
+        long channelId = 0;
+        List<ScheduledRecording> schedules = new ArrayList<>();
+        ScheduledRecording r1 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 200L, 400L);
+        schedules.add(r1);
+        ScheduledRecording r2 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 100L, 300L);
+        schedules.add(r2);
+        ScheduledRecording r3 = RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(
+                ++channelId, ++priority, 0L, 200L);
+        schedules.add(r3);
+        // r2 and r1 are clipped.
+        MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedules(schedules, 1),
+                r2, r1);
     }
 
     public void testGetConflictingSchedulesForTune_canTune() {
@@ -516,5 +557,78 @@ public class DvrScheduleManagerTest extends TestCase {
                 INPUT_ID, channelToWatch, 0L, ++priority, schedules, 2), r1);
         MoreAsserts.assertContentsInOrder(DvrScheduleManager.getConflictingSchedulesForWatching(
                 INPUT_ID, channelToWatch, 0L, ++priority, schedules, 1), r3, r1);
+    }
+
+    public void testPartiallyConflictingSchedules() {
+        long priority = 100;
+        long channelId = 0;
+        List<ScheduledRecording> schedules = new ArrayList<>(Arrays.asList(
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 0L, 400L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 0L, 200L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 200L, 500L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 400L, 600L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 700L, 800L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 600L, 900L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 800L, 900L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 800L, 900L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 750L, 850L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 300L, 450L),
+                RecordingTestUtils.createTestRecordingWithPriorityAndPeriod(++channelId,
+                        --priority, 50L, 900L)
+        ));
+        Map<ScheduledRecording, Boolean> conflictsInfo = DvrScheduleManager
+                .getConflictingSchedulesInfo(schedules, 1);
+
+        assertNull(conflictsInfo.get(schedules.get(0)));
+        assertFalse(conflictsInfo.get(schedules.get(1)));
+        assertTrue(conflictsInfo.get(schedules.get(2)));
+        assertTrue(conflictsInfo.get(schedules.get(3)));
+        assertNull(conflictsInfo.get(schedules.get(4)));
+        assertTrue(conflictsInfo.get(schedules.get(5)));
+        assertNull(conflictsInfo.get(schedules.get(6)));
+        assertFalse(conflictsInfo.get(schedules.get(7)));
+        assertFalse(conflictsInfo.get(schedules.get(8)));
+        assertFalse(conflictsInfo.get(schedules.get(9)));
+        assertFalse(conflictsInfo.get(schedules.get(10)));
+
+        conflictsInfo = DvrScheduleManager
+                .getConflictingSchedulesInfo(schedules, 2);
+
+        assertNull(conflictsInfo.get(schedules.get(0)));
+        assertNull(conflictsInfo.get(schedules.get(1)));
+        assertNull(conflictsInfo.get(schedules.get(2)));
+        assertNull(conflictsInfo.get(schedules.get(3)));
+        assertNull(conflictsInfo.get(schedules.get(4)));
+        assertNull(conflictsInfo.get(schedules.get(5)));
+        assertNull(conflictsInfo.get(schedules.get(6)));
+        assertFalse(conflictsInfo.get(schedules.get(7)));
+        assertFalse(conflictsInfo.get(schedules.get(8)));
+        assertFalse(conflictsInfo.get(schedules.get(9)));
+        assertTrue(conflictsInfo.get(schedules.get(10)));
+
+        conflictsInfo = DvrScheduleManager
+                .getConflictingSchedulesInfo(schedules, 3);
+
+        assertNull(conflictsInfo.get(schedules.get(0)));
+        assertNull(conflictsInfo.get(schedules.get(1)));
+        assertNull(conflictsInfo.get(schedules.get(2)));
+        assertNull(conflictsInfo.get(schedules.get(3)));
+        assertNull(conflictsInfo.get(schedules.get(4)));
+        assertNull(conflictsInfo.get(schedules.get(5)));
+        assertNull(conflictsInfo.get(schedules.get(6)));
+        assertNull(conflictsInfo.get(schedules.get(7)));
+        assertTrue(conflictsInfo.get(schedules.get(8)));
+        assertNull(conflictsInfo.get(schedules.get(9)));
+        assertTrue(conflictsInfo.get(schedules.get(10)));
     }
 }

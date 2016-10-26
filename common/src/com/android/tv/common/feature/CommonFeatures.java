@@ -16,6 +16,7 @@
 
 package com.android.tv.common.feature;
 
+import static com.android.tv.common.feature.FeatureUtils.AND;
 import static com.android.tv.common.feature.FeatureUtils.OR;
 import static com.android.tv.common.feature.TestableFeature.createTestableFeature;
 
@@ -30,12 +31,10 @@ public class CommonFeatures {
      *
      * <p>See <a href="https://goto.google.com/atv-dvr-onepager">go/atv-dvr-onepager</a>
      *
-     * DVR API is introduced in N.
-     *
-     * STOPSHIP: Double-check of DVR is a part of the release before launching.
+     * DVR API is introduced in N, it only works when app runs as a system app.
      */
-    public static final TestableFeature DVR =
-            createTestableFeature(OR(Sdk.N_PRE_2_OR_HIGHER, Sdk.AT_LEAST_N));
+    public static final TestableFeature DVR = createTestableFeature(
+            AND(OR(Sdk.N_PRE_2_OR_HIGHER, Sdk.AT_LEAST_N), SystemAppFeature.SYSTEM_APP_FEATURE));
 
     /**
      * ENABLE_RECORDING_REGARDLESS_OF_STORAGE_STATUS

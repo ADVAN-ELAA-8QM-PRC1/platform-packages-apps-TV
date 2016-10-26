@@ -46,7 +46,7 @@ import com.android.tv.tuner.data.Channel;
 import com.android.tv.tuner.data.PsipData;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.source.FileTsStreamer;
-import com.android.tv.tuner.source.TsMediaDataSource;
+import com.android.tv.tuner.source.TsDataSource;
 import com.android.tv.tuner.source.TsStreamer;
 import com.android.tv.tuner.source.TunerTsStreamer;
 import com.android.tv.tuner.tvinput.ChannelDataManager;
@@ -120,6 +120,7 @@ public class ScanFragment extends SetupFragment {
             }
         });
         Bundle args = getArguments();
+        // TODO: Handle the case when the fragment is restored.
         startScan(args == null ? 0 : args.getInt(EXTRA_FOR_CHANNEL_SCAN_FILE, 0));
         TextView scanTitleView = (TextView) view.findViewById(R.id.tune_title);
         if (TunerInputInfoUtils.isBuiltInTuner(getActivity())){
@@ -147,8 +148,10 @@ public class ScanFragment extends SetupFragment {
 
     @Override
     public void onDetach() {
-        // Ensure scan task will stop.
-        mChannelScanTask.stopScan();
+        if (mChannelScanTask != null) {
+            // Ensure scan task will stop.
+            mChannelScanTask.stopScan();
+        }
         super.onDetach();
     }
 
@@ -231,7 +234,7 @@ public class ScanFragment extends SetupFragment {
     }
 
     private class ChannelScanTask extends AsyncTask<Void, Integer, Void>
-            implements EventDetector.EventListener {
+            implements EventDetector.EventListener, ChannelDataManager.ChannelScanListener {
         private static final int MAX_PROGRESS = 100;
 
         private final Activity mActivity;
@@ -260,6 +263,7 @@ public class ScanFragment extends SetupFragment {
             }
             mFileTsStreamer = SCAN_LOCAL_STREAMS ? new FileTsStreamer(this) : null;
             mConditionStopped = new ConditionVariable();
+            mChannelDataManager.setChannelScanListener(this, new Handler());
         }
 
         private void maybeSetChannelListVisible() {
@@ -302,25 +306,7 @@ public class ScanFragment extends SetupFragment {
             mScanChannelList.addAll(ChannelScanFileParser.parseScanFile(
                     getResources().openRawResource(mChannelMapId)));
             scanChannels();
-            mChannelDataManager.setCurrentVersion(mActivity);
-            mChannelDataManager.release();
             return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void result) {
-            mIsFinished = true;
-            TunerPreferences.setScannedChannelCount(mActivity.getApplicationContext(),
-                    mChannelDataManager.getScannedChannelCount());
-            // Cancel a previously shown recommendation card.
-            TunerSetupActivity.cancelRecommendationCard(mActivity.getApplicationContext());
-            // Mark scan as done
-            TunerPreferences.setScanDone(mActivity.getApplicationContext());
-            // finishing will be done manually.
-            if (mFinishingProgressDialog != null) {
-                mFinishingProgressDialog.dismiss();
-            }
-            onActionClick(ACTION_CATEGORY, mIsCanceled ? ACTION_CANCEL : ACTION_FINISH);
         }
 
         @Override
@@ -404,7 +390,7 @@ public class ScanFragment extends SetupFragment {
                             tunerChannel.getProgramNumber()));
                     tunerChannel.setVirtualMajor(scanChannel.radioFrequencyNumber);
                     tunerChannel.setVirtualMinor(tunerChannel.getProgramNumber());
-                    mChannelDataManager.notifyChannelDetected(tunerChannel, true);
+                    onChannelDetected(tunerChannel, true);
                 }
             }
         }
@@ -452,6 +438,25 @@ public class ScanFragment extends SetupFragment {
                         getString(R.string.ut_setup_cancel), true, false);
             }
         }
+
+        @Override
+        public void onChannelHandlingDone() {
+            mChannelDataManager.setCurrentVersion(mActivity);
+            mChannelDataManager.releaseSafely();
+            mIsFinished = true;
+            TunerPreferences.setScannedChannelCount(mActivity.getApplicationContext(),
+                    mChannelDataManager.getScannedChannelCount());
+            // Cancel a previously shown recommendation card.
+            TunerSetupActivity.cancelRecommendationCard(mActivity.getApplicationContext());
+            // Mark scan as done
+            TunerPreferences.setScanDone(mActivity.getApplicationContext());
+            // finishing will be done manually.
+            if (mFinishingProgressDialog != null) {
+                mFinishingProgressDialog.dismiss();
+            }
+            onActionClick(ACTION_CATEGORY, mIsCanceled ? ACTION_CANCEL : ACTION_FINISH);
+            mChannelScanTask = null;
+        }
     }
 
     private static class FakeTsStreamer implements TsStreamer {
@@ -493,7 +498,7 @@ public class ScanFragment extends SetupFragment {
         }
 
         @Override
-        public TsMediaDataSource createMediaDataSource() {
+        public TsDataSource createDataSource() {
             return null;
         }
     }

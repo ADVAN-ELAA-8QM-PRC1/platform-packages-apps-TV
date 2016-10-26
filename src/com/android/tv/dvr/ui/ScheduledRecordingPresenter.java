@@ -20,12 +20,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.media.tv.TvContract;
 import android.os.Handler;
-import android.support.v17.leanback.widget.Presenter;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.TextAppearanceSpan;
-import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.tv.ApplicationSingletons;
@@ -33,7 +31,7 @@ import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
-import com.android.tv.dvr.DvrUiHelper;
+import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.util.Utils;
 
@@ -42,10 +40,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * Presents a {@link ScheduledRecording} in the {@link DvrBrowseFragment}.
  */
-public class ScheduledRecordingPresenter extends Presenter {
+public class ScheduledRecordingPresenter extends DvrItemPresenter {
     private static final long PROGRESS_UPDATE_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
 
     private final ChannelDataManager mChannelDataManager;
+    private final DvrManager mDvrManager;
     private final Context mContext;
     private final int mProgressBarColor;
 
@@ -95,6 +94,7 @@ public class ScheduledRecordingPresenter extends Presenter {
     public ScheduledRecordingPresenter(Context context) {
         ApplicationSingletons singletons = TvApplication.getSingletons(context);
         mChannelDataManager = singletons.getChannelDataManager();
+        mDvrManager = singletons.getDvrManager();
         mContext = context;
         mProgressBarColor = context.getResources()
                 .getColor(R.color.play_controls_recording_icon_color_on_focus);
@@ -129,19 +129,15 @@ public class ScheduledRecordingPresenter extends Presenter {
             cardView.setContent(Utils.getDurationString(context, recording.getStartTimeMs(),
                     recording.getStartTimeMs(), false, true, false, 0), null);
         }
+        if (mDvrManager.isConflicting(recording)) {
+            cardView.setAffiliatedIcon(R.drawable.ic_warning_white_32dp);
+        } else {
+            cardView.setAffiliatedIcon(0);
+        }
         viewHolder.updateProgressBar();
-        View.OnClickListener clickListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (v instanceof RecordingCardView) {
-                    DvrUiHelper.startDetailsActivity((Activity) v.getContext(), recording,
-                            ((RecordingCardView) v).getImageView(), false);
-                }
-            }
-        };
-        baseHolder.view.setOnClickListener(clickListener);
         viewHolder.mScheduledRecording = recording;
         viewHolder.startUpdateProgressBar();
+        super.onBindViewHolder(viewHolder, o);
     }
 
     @Override
@@ -151,6 +147,7 @@ public class ScheduledRecordingPresenter extends Presenter {
         final RecordingCardView cardView = (RecordingCardView) viewHolder.view;
         viewHolder.mScheduledRecording = null;
         cardView.reset();
+        super.onUnbindViewHolder(viewHolder);
     }
 
     private void setTitleAndImage(RecordingCardView cardView, ScheduledRecording recording) {

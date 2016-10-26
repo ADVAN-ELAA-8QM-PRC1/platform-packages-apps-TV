@@ -22,6 +22,7 @@ import android.content.res.Resources;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
 import com.android.tv.R;
@@ -36,8 +37,6 @@ public class DvrPlaybackCardPresenter extends RecordedProgramPresenter {
     private static final String TAG = "DvrPlaybackCardPresenter";
     private static final boolean DEBUG = false;
 
-    private int mSelectedBackgroundColor = -1;
-    private int mDefaultBackgroundColor = -1;
     private final int mRelatedRecordingCardWidth;
     private final int mRelatedRecordingCardHeight;
 
@@ -58,12 +57,17 @@ public class DvrPlaybackCardPresenter extends RecordedProgramPresenter {
     }
 
     @Override
-    public void onClick(View v) {
-        long programId = (long) v.getTag();
-        if (DEBUG) Log.d(TAG, "Play Related Recording:" + programId);
-        Intent intent = new Intent(getContext(), DvrPlaybackActivity.class);
-        intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_ID, programId);
-        getContext().startActivity(intent);
+    protected OnClickListener onCreateOnClickListener() {
+        return new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                long programId = ((RecordedProgram) v.getTag()).getId();
+                if (DEBUG) Log.d(TAG, "Play Related Recording:" + programId);
+                Intent intent = new Intent(getContext(), DvrPlaybackActivity.class);
+                intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_ID, programId);
+                getContext().startActivity(intent);
+            }
+        };
     }
 
     @Override

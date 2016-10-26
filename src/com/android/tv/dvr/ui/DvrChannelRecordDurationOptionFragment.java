@@ -26,7 +26,6 @@ import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
-import com.android.tv.data.Program;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.dvr.ui.DvrConflictFragment.DvrChannelRecordConflictFragment;
@@ -38,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 public class DvrChannelRecordDurationOptionFragment extends DvrGuidedStepFragment {
     private final List<Long> mDurations = new ArrayList<>();
     private Channel mChannel;
-    private Program mProgram;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {

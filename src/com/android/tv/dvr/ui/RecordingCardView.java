@@ -48,6 +48,8 @@ class RecordingCardView extends BaseCardView {
     private final TextView mMajorContentView;
     private final TextView mMinorContentView;
     private final ProgressBar mProgressBar;
+    private final View mAffiliatedIconContainer;
+    private final ImageView mAffiliatedIcon;
     private final Drawable mDefaultImage;
 
     RecordingCardView(Context context) {
@@ -71,6 +73,8 @@ class RecordingCardView extends BaseCardView {
         mImageWidth = imageWidth;
         mImageHeight = imageHeight;
         mProgressBar = (ProgressBar) findViewById(R.id.recording_progress);
+        mAffiliatedIconContainer = findViewById(R.id.affiliated_icon_container);
+        mAffiliatedIcon = (ImageView) findViewById(R.id.affiliated_icon);
         mTitleView = (TextView) findViewById(R.id.title);
         mMajorContentView = (TextView) findViewById(R.id.content_major);
         mMinorContentView = (TextView) findViewById(R.id.content_minor);
@@ -135,6 +139,15 @@ class RecordingCardView extends BaseCardView {
     public void setImage(Drawable image) {
         if (image != null) {
             mImageView.setImageDrawable(image);
+        }
+    }
+
+    public void setAffiliatedIcon(int imageResId) {
+        if (imageResId > 0) {
+            mAffiliatedIconContainer.setVisibility(View.VISIBLE);
+            mAffiliatedIcon.setImageResource(imageResId);
+        } else {
+            mAffiliatedIconContainer.setVisibility(View.INVISIBLE);
         }
     }
 

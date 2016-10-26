@@ -36,7 +36,6 @@ import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
 import com.android.tv.data.Program;
-import com.android.tv.dvr.ui.DvrCancelAllSeriesRecordingDialogFragment;
 import com.android.tv.dvr.ui.DvrDetailsActivity;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrAlreadyRecordedDialogFragment;
@@ -44,13 +43,19 @@ import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrAlreadyScheduledDialo
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrChannelRecordDurationOptionDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrChannelWatchConflictDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrInsufficientSpaceErrorDialogFragment;
+import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrMissingStorageErrorDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrProgramConflictDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrScheduleDialogFragment;
+import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrSmallSizedStorageErrorDialogFragment;
 import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrStopRecordingDialogFragment;
-import com.android.tv.dvr.ui.DvrHalfSizedDialogFragment.DvrMissingStorageErrorDialogFragment;
 import com.android.tv.dvr.ui.DvrSchedulesActivity;
 import com.android.tv.dvr.ui.DvrSeriesDeletionActivity;
+import com.android.tv.dvr.ui.DvrSeriesScheduledDialogActivity;
 import com.android.tv.dvr.ui.DvrSeriesSettingsActivity;
+import com.android.tv.dvr.ui.DvrStopRecordingFragment;
+import com.android.tv.dvr.ui.DvrStopSeriesRecordingDialogFragment;
+import com.android.tv.dvr.ui.DvrStopSeriesRecordingFragment;
+import com.android.tv.dvr.ui.HalfSizedDialogFragment;
 import com.android.tv.dvr.ui.list.DvrSchedulesFragment;
 import com.android.tv.dvr.ui.list.DvrSeriesSchedulesFragment;
 import com.android.tv.util.Utils;
@@ -82,7 +87,7 @@ public class DvrUiHelper {
             }
         } else {
             SeriesRecording seriesRecording = dvrManager.getSeriesRecording(program);
-            if (seriesRecording == null) {
+            if (seriesRecording == null || seriesRecording.isStopped()) {
                 DvrUiHelper.showScheduleDialog(activity, program);
                 return false;
             } else {
@@ -108,6 +113,32 @@ public class DvrUiHelper {
         }
         return true;
 
+    }
+
+    /**
+     * Checks if the storage status is good for recording and shows error messages if needed.
+     *
+     * @return true if the storage status is fine to be recorded for {@code inputId}.
+     */
+    public static boolean checkStorageStatusAndShowErrorMessage(Activity activity, String inputId) {
+        if (!Utils.isBundledInput(inputId)) {
+            return true;
+        }
+        DvrStorageStatusManager dvrStorageStatusManager =
+                TvApplication.getSingletons(activity).getDvrStorageStatusManager();
+        int status = dvrStorageStatusManager.getDvrStorageStatus();
+        if (status == DvrStorageStatusManager.STORAGE_STATUS_TOTAL_CAPACITY_TOO_SMALL) {
+            showDvrSmallSizedStorageErrorDialog(activity);
+            return false;
+        } else if (status == DvrStorageStatusManager.STORAGE_STATUS_MISSING) {
+            showDvrMissingStorageErrorDialog(activity, inputId);
+            return false;
+        } else if (status == DvrStorageStatusManager.STORAGE_STATUS_FREE_SPACE_INSUFFICIENT) {
+            // TODO: handle insufficient storage case.
+            return true;
+        } else {
+            return true;
+        }
     }
 
     /**
@@ -170,7 +201,7 @@ public class DvrUiHelper {
     /**
      * Shows DVR missing storage error dialog.
      */
-    public static void showDvrMissingStorageErrorDialog(Activity activity, String inputId) {
+    private static void showDvrMissingStorageErrorDialog(Activity activity, String inputId) {
         SoftPreconditions.checkArgument(!TextUtils.isEmpty(inputId));
         Bundle args = new Bundle();
         args.putString(DvrHalfSizedDialogFragment.KEY_INPUT_ID, inputId);
@@ -178,15 +209,23 @@ public class DvrUiHelper {
     }
 
     /**
+     * Shows DVR small sized storage error dialog.
+     */
+    public static void showDvrSmallSizedStorageErrorDialog(Activity activity) {
+        showDialogFragment(activity, new DvrSmallSizedStorageErrorDialogFragment(), null);
+    }
+
+    /**
      * Shows stop recording dialog.
      */
-    public static void showStopRecordingDialog(MainActivity activity, Channel channel) {
-        if (channel == null) {
-            return;
-        }
+    public static void showStopRecordingDialog(Activity activity, long channelId, int reason,
+            HalfSizedDialogFragment.OnActionClickListener listener) {
         Bundle args = new Bundle();
-        args.putLong(DvrHalfSizedDialogFragment.KEY_CHANNEL_ID, channel.getId());
-        showDialogFragment(activity, new DvrStopRecordingDialogFragment(), args);
+        args.putLong(DvrHalfSizedDialogFragment.KEY_CHANNEL_ID, channelId);
+        args.putInt(DvrStopRecordingFragment.KEY_REASON, reason);
+        DvrHalfSizedDialogFragment fragment = new DvrStopRecordingDialogFragment();
+        fragment.setOnActionClickListener(listener);
+        showDialogFragment(activity, fragment, args);
     }
 
     /**
@@ -244,7 +283,8 @@ public class DvrUiHelper {
             recordings) {
         ScheduledRecording earlistScheduledRecording = null;
         if (!recordings.isEmpty()) {
-            Collections.sort(recordings, ScheduledRecording.START_TIME_THEN_PRIORITY_COMPARATOR);
+            Collections.sort(recordings,
+                    ScheduledRecording.START_TIME_THEN_PRIORITY_THEN_ID_COMPARATOR);
             earlistScheduledRecording = recordings.get(0);
         }
         return earlistScheduledRecording;
@@ -300,50 +340,73 @@ public class DvrUiHelper {
 
     /**
      * Shows the series settings activity.
+     *
+     * @param channelIds Channel ID list which has programs belonging to the series.
      */
-    public static void startSeriesSettingsActivity(Context context, long seriesRecordingId) {
+    public static void startSeriesSettingsActivity(Context context, long seriesRecordingId,
+            @Nullable long[] channelIds, boolean removeEmptySeriesSchedule,
+            boolean isWindowTranslucent, boolean showViewScheduleOptionInDialog) {
         Intent intent = new Intent(context, DvrSeriesSettingsActivity.class);
         intent.putExtra(DvrSeriesSettingsActivity.SERIES_RECORDING_ID, seriesRecordingId);
+        intent.putExtra(DvrSeriesSettingsActivity.CHANNEL_ID_LIST, channelIds);
+        intent.putExtra(DvrSeriesSettingsActivity.REMOVE_EMPTY_SERIES_RECORDING,
+                removeEmptySeriesSchedule);
+        intent.putExtra(DvrSeriesSettingsActivity.IS_WINDOW_TRANSLUCENT, isWindowTranslucent);
+        intent.putExtra(DvrSeriesSettingsActivity.SHOW_VIEW_SCHEDULE_OPTION_IN_DIALOG,
+                showViewScheduleOptionInDialog);
         context.startActivity(intent);
     }
 
     /**
-     * Shows the details activity for the schedule.
+     * Shows "series recording scheduled" dialog activity.
      */
-    public static void startDetailsActivity(Activity activity, ScheduledRecording schedule,
-            @Nullable ImageView imageView, boolean hideViewSchedule) {
-        if (schedule == null) {
+    public static void StartSeriesScheduledDialogActivity(Context context,
+            SeriesRecording seriesRecording, boolean showViewScheduleOptionInDialog) {
+        if (seriesRecording == null) {
             return;
         }
-        int viewType;
-        if (schedule.getState() == ScheduledRecording.STATE_RECORDING_NOT_STARTED) {
-            viewType = DvrDetailsActivity.SCHEDULED_RECORDING_VIEW;
-        } else if (schedule.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
-            viewType = DvrDetailsActivity.CURRENT_RECORDING_VIEW;
-        } else {
-            return;
-        }
-        Intent intent = new Intent(activity, DvrDetailsActivity.class);
-        intent.putExtra(DvrDetailsActivity.DETAILS_VIEW_TYPE, viewType);
-        intent.putExtra(DvrDetailsActivity.RECORDING_ID, schedule.getId());
-        intent.putExtra(DvrDetailsActivity.HIDE_VIEW_SCHEDULE, hideViewSchedule);
-        Bundle bundle = null;
-        if (imageView != null) {
-            bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(activity, imageView,
-                    DvrDetailsActivity.SHARED_ELEMENT_NAME).toBundle();
-        }
-        activity.startActivity(intent, bundle);
+        Intent intent = new Intent(context, DvrSeriesScheduledDialogActivity.class);
+        intent.putExtra(DvrSeriesScheduledDialogActivity.SERIES_RECORDING_ID,
+                seriesRecording.getId());
+        intent.putExtra(DvrSeriesScheduledDialogActivity.SHOW_VIEW_SCHEDULE_OPTION,
+                showViewScheduleOptionInDialog);
+        context.startActivity(intent);
     }
 
     /**
-     * Shows the details activity for the recorded program.
+     * Shows the details activity for the DVR items. The type of DVR items may be
+     * {@link ScheduledRecording}, {@link RecordedProgram}, or {@link SeriesRecording}.
      */
-    public static void startDetailsActivity(Activity activity, RecordedProgram recordedProgram,
-            @Nullable ImageView imageView) {
+    public static void startDetailsActivity(Activity activity, Object dvrItem,
+            @Nullable ImageView imageView, boolean hideViewSchedule) {
+        if (dvrItem == null) {
+            return;
+        }
         Intent intent = new Intent(activity, DvrDetailsActivity.class);
-        intent.putExtra(DvrDetailsActivity.RECORDING_ID, recordedProgram.getId());
-        intent.putExtra(DvrDetailsActivity.DETAILS_VIEW_TYPE,
-                DvrDetailsActivity.RECORDED_PROGRAM_VIEW);
+        long recordingId;
+        int viewType;
+        if (dvrItem instanceof ScheduledRecording) {
+            ScheduledRecording schedule = (ScheduledRecording) dvrItem;
+            recordingId = schedule.getId();
+            if (schedule.getState() == ScheduledRecording.STATE_RECORDING_NOT_STARTED) {
+                viewType = DvrDetailsActivity.SCHEDULED_RECORDING_VIEW;
+            } else if (schedule.getState() == ScheduledRecording.STATE_RECORDING_IN_PROGRESS) {
+                viewType = DvrDetailsActivity.CURRENT_RECORDING_VIEW;
+            } else {
+                return;
+            }
+        } else if (dvrItem instanceof RecordedProgram) {
+            recordingId = ((RecordedProgram) dvrItem).getId();
+            viewType = DvrDetailsActivity.RECORDED_PROGRAM_VIEW;
+        } else if (dvrItem instanceof SeriesRecording) {
+            recordingId = ((SeriesRecording) dvrItem).getId();
+            viewType = DvrDetailsActivity.SERIES_RECORDING_VIEW;
+        } else {
+            return;
+        }
+        intent.putExtra(DvrDetailsActivity.RECORDING_ID, recordingId);
+        intent.putExtra(DvrDetailsActivity.DETAILS_VIEW_TYPE, viewType);
+        intent.putExtra(DvrDetailsActivity.HIDE_VIEW_SCHEDULE, hideViewSchedule);
         Bundle bundle = null;
         if (imageView != null) {
             bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(activity, imageView,
@@ -355,11 +418,16 @@ public class DvrUiHelper {
     /**
      * Shows the cancel all dialog for series schedules list.
      */
-    public static void showCancelAllSeriesRecordingDialog(DvrSchedulesActivity activity) {
-        DvrCancelAllSeriesRecordingDialogFragment dvrCancelAllSeriesRecordingDialogFragment =
-                new DvrCancelAllSeriesRecordingDialogFragment();
-        dvrCancelAllSeriesRecordingDialogFragment.show(activity.getFragmentManager(),
-                DvrCancelAllSeriesRecordingDialogFragment.DIALOG_TAG);
+    public static void showCancelAllSeriesRecordingDialog(DvrSchedulesActivity activity,
+            SeriesRecording seriesRecording) {
+        DvrStopSeriesRecordingDialogFragment dvrStopSeriesRecordingDialogFragment =
+                new DvrStopSeriesRecordingDialogFragment();
+        Bundle arguments = new Bundle();
+        arguments.putParcelable(DvrStopSeriesRecordingFragment.KEY_SERIES_RECORDING,
+                seriesRecording);
+        dvrStopSeriesRecordingDialogFragment.setArguments(arguments);
+        dvrStopSeriesRecordingDialogFragment.show(activity.getFragmentManager(),
+                DvrStopSeriesRecordingDialogFragment.DIALOG_TAG);
     }
 
     /**

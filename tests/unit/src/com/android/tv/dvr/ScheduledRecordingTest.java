@@ -89,11 +89,11 @@ public class ScheduledRecordingTest extends TestCase {
                 createTestRecordingWithIdAndPeriod(3, INPUT_ID, CHANNEL_ID, 10L, 20L));
 
         // default priority
-        MoreAsserts.assertContentsInOrder(sortByPriority(a, b, c), c, b, a);
+        MoreAsserts.assertContentsInOrder(sortByPriority(c, b, a), a, b, c);
 
         // make A preferred over B
-        a = ScheduledRecording.buildFrom(a).setPriority(b.getPriority() + 1).build();
-        MoreAsserts.assertContentsInOrder(sortByPriority(c, b, a), c, a, b);
+        a = ScheduledRecording.buildFrom(a).setPriority(b.getPriority() + 2).build();
+        MoreAsserts.assertContentsInOrder(sortByPriority(a, b, c), b, c, a);
     }
 
     public Collection<ScheduledRecording> sortByPriority(ScheduledRecording a, ScheduledRecording b,

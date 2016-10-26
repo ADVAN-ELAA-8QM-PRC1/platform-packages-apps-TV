@@ -16,6 +16,8 @@
 
 package com.android.tv.tuner.tvinput;
 
+import android.app.job.JobInfo;
+import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.Context;
 import android.media.tv.TvContract;
@@ -25,6 +27,7 @@ import android.util.Log;
 import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.audio.AudioCapabilitiesReceiver;
 import com.android.tv.TvApplication;
+import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.tuner.exoplayer.buffer.BufferManager;
 import com.android.tv.tuner.exoplayer.buffer.TrickplayStorageManager;
 import com.android.tv.tuner.util.SystemPropertiesProxy;
@@ -32,6 +35,7 @@ import com.android.tv.tuner.util.SystemPropertiesProxy;
 import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * {@link TunerTvInputService} serves TV channels coming from a tuner device.
@@ -41,10 +45,10 @@ public class TunerTvInputService extends TvInputService
     private static final String TAG = "TunerTvInputService";
     private static final boolean DEBUG = false;
 
-
     private static final String MAX_BUFFER_SIZE_KEY = "tv.tuner.buffersize_mbytes";
     private static final int MAX_BUFFER_SIZE_DEF = 2 * 1024;  // 2GB
     private static final int MIN_BUFFER_SIZE_DEF = 256;  // 256MB
+    private static final int DVR_STORAGE_CLEANUP_JOB_ID = 100;
 
     // WeakContainer for {@link TvInputSessionImpl}
     private final Set<TunerSession> mTunerSessions = Collections.newSetFromMap(new WeakHashMap<>());
@@ -62,6 +66,19 @@ public class TunerTvInputService extends TvInputService
         mAudioCapabilitiesReceiver = new AudioCapabilitiesReceiver(getApplicationContext(), this);
         mAudioCapabilitiesReceiver.register();
         mBufferManager = createBufferManager();
+        if (CommonFeatures.DVR.isEnabled(this)) {
+            JobScheduler jobScheduler =
+                    (JobScheduler) getSystemService(Context.JOB_SCHEDULER_SERVICE);
+            JobInfo pendingJob = jobScheduler.getPendingJob(DVR_STORAGE_CLEANUP_JOB_ID);
+            if (pendingJob != null) {
+                // storage cleaning job is already scheduled.
+            } else {
+                JobInfo job = new JobInfo.Builder(DVR_STORAGE_CLEANUP_JOB_ID,
+                        new ComponentName(this, TunerStorageCleanUpService.class))
+                        .setPersisted(true).setPeriodic(TimeUnit.DAYS.toMillis(1)).build();
+                jobScheduler.schedule(job);
+            }
+        }
         if (mBufferManager == null) {
             Log.i(TAG, "Trickplay is disabled");
         } else {

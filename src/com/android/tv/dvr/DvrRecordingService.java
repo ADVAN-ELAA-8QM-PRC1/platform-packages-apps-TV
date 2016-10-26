@@ -70,7 +70,6 @@ public class DvrRecordingService extends Service {
         super.onCreate();
         SoftPreconditions.checkFeatureEnabled(this, CommonFeatures.DVR, TAG);
         ApplicationSingletons singletons = TvApplication.getSingletons(this);
-        DvrManager dvrManager = singletons.getDvrManager();
         WritableDvrDataManager dataManager = (WritableDvrDataManager) singletons.getDvrDataManager();
 
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
@@ -103,7 +102,7 @@ public class DvrRecordingService extends Service {
         mScheduler.stop();
         mScheduler = null;
         if (mHandlerThread != null) {
-            mHandlerThread.quit();
+            mHandlerThread.quitSafely();
             mHandlerThread = null;
         }
         super.onDestroy();

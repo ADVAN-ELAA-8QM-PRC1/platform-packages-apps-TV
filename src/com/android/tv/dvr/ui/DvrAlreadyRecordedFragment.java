@@ -96,7 +96,7 @@ public class DvrAlreadyRecordedFragment extends DvrGuidedStepFragment {
         if (action.getId() == ACTION_RECORD_ANYWAY) {
             getDvrManager().addSchedule(mProgram);
         } else if (action.getId() == ACTION_WATCH) {
-            DvrUiHelper.startDetailsActivity(getActivity(), mDuplicate, null);
+            DvrUiHelper.startDetailsActivity(getActivity(), mDuplicate, null, false);
         }
         dismissDialog();
     }

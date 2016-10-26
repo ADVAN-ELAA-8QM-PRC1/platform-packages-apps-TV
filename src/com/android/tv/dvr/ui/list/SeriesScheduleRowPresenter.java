@@ -21,16 +21,16 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.tv.R;
+import com.android.tv.common.SoftPreconditions;
 import com.android.tv.dvr.DvrUiHelper;
-import com.android.tv.dvr.ScheduledRecording;
-import com.android.tv.dvr.ui.list.SchedulesHeaderRow.SeriesRecordingHeaderRow;
 import com.android.tv.util.Utils;
 
 /**
  * A RowPresenter for series schedule row.
  */
 public class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
-    private boolean mIsCancelAll;
+    private static final String TAG = "SeriesRowPresenter";
+
     private boolean mLtr;
 
     public SeriesScheduleRowPresenter(Context context) {
@@ -40,8 +40,8 @@ public class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
     }
 
     public static class SeriesScheduleRowViewHolder extends ScheduleRowViewHolder {
-        public SeriesScheduleRowViewHolder(View view) {
-            super(view);
+        public SeriesScheduleRowViewHolder(View view, ScheduleRowPresenter presenter) {
+            super(view, presenter);
             ViewGroup.LayoutParams lp = getTimeView().getLayoutParams();
             lp.width = view.getResources().getDimensionPixelSize(
                     R.dimen.dvr_series_schedules_item_time_width);
@@ -51,37 +51,29 @@ public class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
 
     @Override
     protected ScheduleRowViewHolder onGetScheduleRowViewHolder(View view) {
-        return new SeriesScheduleRowViewHolder(view);
+        return new SeriesScheduleRowViewHolder(view, this);
     }
 
     @Override
-    protected String onGetRecordingTimeText(ScheduledRecording recording) {
-        return Utils.getDurationString(getContext(),
-                recording.getStartTimeMs(), recording.getEndTimeMs(), false, true, true, 0);
+    protected String onGetRecordingTimeText(ScheduleRow row) {
+        return Utils.getDurationString(getContext(), row.getStartTimeMs(), row.getEndTimeMs(),
+                false, true, true, 0);
     }
 
     @Override
-    protected String onGetProgramInfoText(ScheduledRecording recording) {
-        if (recording != null) {
-            return recording.getEpisodeDisplayTitle(getContext());
-        }
-        return null;
+    protected String onGetProgramInfoText(ScheduleRow row) {
+        return row.getEpisodeDisplayTitle(getContext());
     }
 
     @Override
-    protected void onBindRowViewHolderInternal(ScheduleRowViewHolder viewHolder,
-            ScheduleRow scheduleRow) {
-        mIsCancelAll = ((SeriesRecordingHeaderRow) scheduleRow.getHeaderRow()).isCancelAllChecked();
-        boolean isConflicting = getConflicts().contains(scheduleRow.getRecording());
-        if (mIsCancelAll || isConflicting || scheduleRow.isRemoveScheduleChecked()) {
-            viewHolder.greyOutInfo();
-        } else {
-            viewHolder.whiteBackInfo();
-        }
-        if (!mIsCancelAll && isConflicting) {
+    protected void onBindRowViewHolder(ViewHolder vh, Object item) {
+        super.onBindRowViewHolder(vh, item);
+        SeriesScheduleRowViewHolder viewHolder = (SeriesScheduleRowViewHolder) vh;
+        EpisodicProgramRow row = (EpisodicProgramRow) item;
+        if (getDvrManager().isConflicting(row.getSchedule())) {
             viewHolder.getProgramTitleView().setCompoundDrawablePadding(getContext()
                     .getResources().getDimensionPixelOffset(
-                    R.dimen.dvr_schedules_warning_icon_padding));
+                            R.dimen.dvr_schedules_warning_icon_padding));
             if (mLtr) {
                 viewHolder.getProgramTitleView().setCompoundDrawablesWithIntrinsicBounds(
                         R.drawable.ic_warning_gray600_36dp, 0, 0, 0);
@@ -92,26 +84,60 @@ public class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
         } else {
             viewHolder.getProgramTitleView().setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
         }
-        if (mIsCancelAll) {
-            viewHolder.getInfoContainer().setClickable(false);
-            viewHolder.getDeleteActionContainer().setVisibility(View.GONE);
+    }
+
+    @Override
+    protected void onInfoClicked(ScheduleRow row) {
+        if (row.getSchedule() != null) {
+            DvrUiHelper.startSchedulesActivity(getContext(), row.getSchedule());
         }
     }
 
     @Override
-    protected void onRowViewSelectedInternal(ViewHolder vh, boolean selected) {
-        ScheduleRowViewHolder viewHolder = (ScheduleRowViewHolder) vh;
-        if (!mIsCancelAll) {
-            if (selected) {
-                viewHolder.getDeleteActionContainer().setVisibility(View.VISIBLE);
+    protected void onStartRecording(ScheduleRow row) {
+        SoftPreconditions.checkState(row.getSchedule() == null, TAG,
+                "Start request with the existing schedule: " + row);
+        row.setStartRecordingRequested(true);
+        getDvrManager().addScheduleWithHighestPriority(((EpisodicProgramRow) row).getProgram());
+    }
+
+    @Override
+    protected void onStopRecording(ScheduleRow row) {
+        SoftPreconditions.checkState(row.getSchedule() != null, TAG,
+                "Stop request with the null schedule: " + row);
+        row.setStopRecordingRequested(true);
+        getDvrManager().stopRecording(row.getSchedule());
+    }
+
+    @Override
+    protected void onCreateSchedule(ScheduleRow row) {
+        if (row.getSchedule() == null) {
+            getDvrManager().addScheduleWithHighestPriority(((EpisodicProgramRow) row).getProgram());
+        } else {
+            super.onCreateSchedule(row);
+        }
+    }
+
+    @Override
+    @ScheduleRowAction
+    protected int[] getAvailableActions(ScheduleRow row) {
+        if (row.getSchedule() == null) {
+            if (row.isOnAir()) {
+                return new int[] {ACTION_START_RECORDING};
             } else {
-                viewHolder.getDeleteActionContainer().setVisibility(View.GONE);
+                return new int[] {ACTION_CREATE_SCHEDULE};
             }
         }
+        return super.getAvailableActions(row);
     }
 
     @Override
-    protected void onInfoClicked(ScheduleRow scheduleRow) {
-        DvrUiHelper.startSchedulesActivity(getContext(), scheduleRow.getRecording());
+    protected boolean canResolveConflict() {
+        return false;
+    }
+
+    @Override
+    protected boolean shouldKeepScheduleAfterRemoving() {
+        return true;
     }
 }

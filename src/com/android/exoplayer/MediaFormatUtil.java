@@ -17,6 +17,8 @@ package com.google.android.exoplayer;
 
 import android.support.annotation.Nullable;
 
+import com.google.android.exoplayer.util.MimeTypes;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
@@ -29,7 +31,6 @@ public class MediaFormatUtil {
      * {@link android.media.MediaFormat} should be converted to be used with ExoPlayer.
      */
     public static MediaFormat createMediaFormat(android.media.MediaFormat format) {
-        // TODO: Add test for this method.
         String mimeType = format.getString(android.media.MediaFormat.KEY_MIME);
         String language = getOptionalStringV16(format, android.media.MediaFormat.KEY_LANGUAGE);
         int maxInputSize =
@@ -52,34 +53,15 @@ public class MediaFormatUtil {
         }
         long durationUs = format.containsKey(android.media.MediaFormat.KEY_DURATION)
                 ? format.getLong(android.media.MediaFormat.KEY_DURATION) : C.UNKNOWN_TIME_US;
+        int pcmEncoding = MimeTypes.AUDIO_RAW.equals(mimeType) ? C.ENCODING_PCM_16BIT
+                : MediaFormat.NO_VALUE;
         MediaFormat mediaFormat = new MediaFormat(null, mimeType, MediaFormat.NO_VALUE,
                 maxInputSize, durationUs, width, height, rotationDegrees, MediaFormat.NO_VALUE,
                 channelCount, sampleRate, language, MediaFormat.OFFSET_SAMPLE_RELATIVE,
-                initializationData, false, MediaFormat.NO_VALUE, MediaFormat.NO_VALUE,
-                MediaFormat.NO_VALUE, encoderDelay, encoderPadding);
+                initializationData, false, MediaFormat.NO_VALUE, MediaFormat.NO_VALUE, pcmEncoding,
+                encoderDelay, encoderPadding, null, MediaFormat.NO_VALUE);
         mediaFormat.setFrameworkFormatV16(format);
         return mediaFormat;
-    }
-
-    /**
-     * Creates {@link MediaFormat} for audio track.
-     */
-    public static MediaFormat createAudioMediaFormat(String mimeType, long durationUs,
-            int channelCount, int sampleRate) {
-        return MediaFormat.createAudioFormat(null, mimeType, MediaFormat.NO_VALUE,
-                MediaFormat.NO_VALUE, durationUs, channelCount, sampleRate, null, "");
-    }
-
-    /**
-     * Creates {@link MediaFormat} for closed caption track.
-     */
-    public static MediaFormat createTextMediaFormat(String mimeType, long durationUs) {
-        return new MediaFormat(null, mimeType, 0, MediaFormat.NO_VALUE, durationUs,
-                MediaFormat.NO_VALUE, MediaFormat.NO_VALUE, MediaFormat.NO_VALUE,
-                MediaFormat.NO_VALUE, MediaFormat.NO_VALUE, MediaFormat.NO_VALUE, "",
-                MediaFormat.OFFSET_SAMPLE_RELATIVE, null, false, MediaFormat.NO_VALUE,
-                MediaFormat.NO_VALUE, MediaFormat.NO_VALUE, MediaFormat.NO_VALUE,
-                MediaFormat.NO_VALUE);
     }
 
     @Nullable

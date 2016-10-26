@@ -20,6 +20,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
@@ -35,6 +37,8 @@ import com.android.tv.TvApplication;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
+import com.android.tv.data.epg.EpgFetcher;
+import com.android.tv.experiments.Experiments;
 import com.android.tv.tuner.tvinput.TunerTvInputService;
 
 import java.util.Collections;
@@ -267,7 +271,8 @@ public class SetupUtils {
         // Find all already-verified packages.
         Set<String> setUpPackages = new HashSet<>();
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
-        for (String input : sp.getStringSet(PREF_KEY_SET_UP_INPUTS, Collections.<String>emptySet())) {
+        for (String input : sp.getStringSet(PREF_KEY_SET_UP_INPUTS,
+                Collections.<String>emptySet())) {
             if (!TextUtils.isEmpty(input)) {
                 ComponentName componentName = ComponentName.unflattenFromString(input);
                 if (componentName != null) {
@@ -330,14 +335,28 @@ public class SetupUtils {
         removedInputList.remove(mTunerInputId);
 
         if (!removedInputList.isEmpty()) {
+            boolean inputPackageDeleted = false;
             for (String input : removedInputList) {
-                mRecognizedInputs.remove(input);
-                mSetUpInputs.remove(input);
-                mKnownInputs.remove(input);
+                try {
+                    // Just after booting, input list from TvInputManager are not reliable.
+                    // So we need to double-check package existence. b/29034900
+                    mTvApplication.getPackageManager().getPackageInfo(
+                            ComponentName.unflattenFromString(input)
+                            .getPackageName(), PackageManager.GET_ACTIVITIES);
+                    Log.i(TAG, "TV input (" + input + ") is removed but package is not deleted");
+                } catch (NameNotFoundException e) {
+                    Log.i(TAG, "TV input (" + input + ") and its package are removed");
+                    mRecognizedInputs.remove(input);
+                    mSetUpInputs.remove(input);
+                    mKnownInputs.remove(input);
+                    inputPackageDeleted = true;
+                }
             }
-            mSharedPreferences.edit().putStringSet(PREF_KEY_SET_UP_INPUTS, mSetUpInputs)
-                    .putStringSet(PREF_KEY_KNOWN_INPUTS, mKnownInputs)
-                    .putStringSet(PREF_KEY_RECOGNIZED_INPUTS, mRecognizedInputs).apply();
+            if (inputPackageDeleted) {
+                mSharedPreferences.edit().putStringSet(PREF_KEY_SET_UP_INPUTS, mSetUpInputs)
+                        .putStringSet(PREF_KEY_KNOWN_INPUTS, mKnownInputs)
+                        .putStringSet(PREF_KEY_RECOGNIZED_INPUTS, mRecognizedInputs).apply();
+            }
         }
     }
 
@@ -345,7 +364,7 @@ public class SetupUtils {
      * Called when an setup is done. Once it is called, {@link #isSetupDone} returns {@code true}
      * for {@code inputId}.
      */
-    public void onSetupDone(String inputId) {
+    private void onSetupDone(String inputId) {
         SoftPreconditions.checkState(inputId != null);
         if (DEBUG) Log.d(TAG, "onSetupDone: input=" + inputId);
         if (!mRecognizedInputs.contains(inputId)) {
@@ -362,6 +381,14 @@ public class SetupUtils {
         if (!mSetUpInputs.contains(inputId)) {
             mSetUpInputs.add(inputId);
             mSharedPreferences.edit().putStringSet(PREF_KEY_SET_UP_INPUTS, mSetUpInputs).apply();
+        }
+        // Start fetching program guide data for internal tuners.
+        Context context = mTvApplication.getApplicationContext();
+        if (Utils.isInternalTvInput(context, inputId)) {
+            if (context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED && Experiments.CLOUD_EPG.get()) {
+                EpgFetcher.getInstance(context).startImmediately();
+            }
         }
     }
 }

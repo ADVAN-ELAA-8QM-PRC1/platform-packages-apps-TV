@@ -89,7 +89,7 @@ public class ScheduledRecordingDetailsFragment extends RecordingDetailsFragment 
 
     private int getScheduleIconId() {
         if (mDvrManager.isConflicting(getRecording())) {
-            return R.drawable.ic_warning_white_36dp;
+            return R.drawable.ic_warning_white_32dp;
         } else {
             return R.drawable.ic_schedule_32dp;
         }

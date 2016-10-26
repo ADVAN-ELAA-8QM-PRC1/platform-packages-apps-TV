@@ -27,6 +27,7 @@ import android.util.Pair;
 import com.google.android.exoplayer.MediaFormat;
 import com.google.android.exoplayer.SampleHolder;
 import com.google.android.exoplayer.util.MimeTypes;
+import com.android.tv.common.SoftPreconditions;
 import com.android.tv.tuner.exoplayer.buffer.RecordingSampleBuffer.BufferReason;
 
 import java.io.IOException;
@@ -65,6 +66,7 @@ public class SampleChunkIoHelper implements Handler.Callback {
     private final SampleChunk.IoState[] mReadIoStates;
     private final SampleChunk.IoState[] mWriteIoStates;
     private long mBufferDurationUs = 0;
+    private boolean mWriteEnded;
     private boolean mErrorNotified;
     private boolean mFinished;
 
@@ -150,6 +152,7 @@ public class SampleChunkIoHelper implements Handler.Callback {
             for (int i = 0; i < mTrackCount; ++i) {
                 mBufferManager.loadTrackFromStorage(mIds.get(i), mSamplePool);
             }
+            mWriteEnded = true;
         } else {
             for (int i = 0; i < mTrackCount; ++i) {
                 mIoHandler.sendMessage(mIoHandler.obtainMessage(MSG_OPEN_WRITE, i));
@@ -289,6 +292,12 @@ public class SampleChunkIoHelper implements Handler.Callback {
         int index = params.index;
         mIoHandler.removeMessages(MSG_READ, index);
         SampleChunk chunk = mBufferManager.getReadFile(mIds.get(index), params.positionUs);
+        if (chunk == null) {
+            String errorMessage = "Chunk ID:" + mIds.get(index) + " pos:" + params.positionUs
+                    + "is not found";
+            SoftPreconditions.checkNotNull(chunk, TAG, errorMessage);
+            throw new IOException(errorMessage);
+        }
         mReadIoStates[index].openRead(chunk);
         if (mHandlerReadSampleBuffers[index] != null) {
             SampleHolder sample;
@@ -314,6 +323,11 @@ public class SampleChunkIoHelper implements Handler.Callback {
                     mIoHandler.obtainMessage(MSG_READ, index), READ_RESCHEDULING_DELAY_MS);
         } else {
             if (mReadIoStates[index].isReadFinished()) {
+                for (int i = 0; i < mTrackCount; ++i) {
+                    if (!mReadIoStates[i].isReadFinished()) {
+                        return;
+                    }
+                }
                 mIoCallback.onIoReachedEos();
                 return;
             }
@@ -332,6 +346,10 @@ public class SampleChunkIoHelper implements Handler.Callback {
 
     private void doWrite(IoParams params) throws IOException {
         try {
+            if (mWriteEnded) {
+                SoftPreconditions.checkState(false);
+                return;
+            }
             int index = params.index;
             SampleHolder sample = params.sample;
             SampleChunk nextChunk = null;
@@ -355,6 +373,10 @@ public class SampleChunkIoHelper implements Handler.Callback {
     }
 
     private void doCloseWrite() throws IOException {
+        if (mWriteEnded) {
+            return;
+        }
+        mWriteEnded = true;
         boolean readFinished = true;
         for (int i = 0; i < mTrackCount; ++i) {
             readFinished = readFinished && mReadIoStates[i].isReadFinished();

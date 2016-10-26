@@ -21,10 +21,10 @@ import android.database.Cursor;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.IntDef;
-import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
 import android.text.TextUtils;
 
+import com.android.tv.data.BaseProgram;
 import com.android.tv.data.Program;
 import com.android.tv.dvr.provider.DvrContract.SeriesRecordings;
 import com.android.tv.util.Utils;
@@ -69,8 +69,8 @@ public class SeriesRecording implements Parcelable {
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(flag = true,
-            value = {STATE_SERIES_NORMAL, STATE_SERIES_CANCELED})
-    private @interface SeriesState {}
+            value = {STATE_SERIES_NORMAL, STATE_SERIES_STOPPED})
+    public @interface SeriesState {}
 
     /**
      * The state indicates that the series recording is a normal one.
@@ -78,9 +78,9 @@ public class SeriesRecording implements Parcelable {
     public static final int STATE_SERIES_NORMAL = 0;
 
     /**
-     * The state indicates that the series recording is canceled.
+     * The state indicates that the series recording is stopped.
      */
-    public static final int STATE_SERIES_CANCELED = 1;
+    public static final int STATE_SERIES_STOPPED = 1;
 
     /**
      * Compare priority in descending order.
@@ -110,9 +110,9 @@ public class SeriesRecording implements Parcelable {
             };
 
     /**
-     * Creates a new Builder with the values set from the series information of {@link Program}.
+     * Creates a new Builder with the values set from the series information of {@link BaseProgram}.
      */
-    public static Builder builder(String inputId, Program p) {
+    public static Builder builder(String inputId, BaseProgram p) {
         return new Builder()
                 .setInputId(inputId)
                 .setSeriesId(p.getSeriesId())
@@ -190,7 +190,7 @@ public class SeriesRecording implements Parcelable {
                 .setCanonicalGenreIds(c.getString(++index))
                 .setPosterUri(c.getString(++index))
                 .setPhotoUri(c.getString(++index))
-                .setState(seriesRecordingCanceled(c.getString(++index)))
+                .setState(seriesRecordingState(c.getString(++index)))
                 .build();
     }
 
@@ -220,7 +220,7 @@ public class SeriesRecording implements Parcelable {
                 Utils.getCanonicalGenre(r.getCanonicalGenreIds()));
         values.put(SeriesRecordings.COLUMN_POSTER_URI, r.getPosterUri());
         values.put(SeriesRecordings.COLUMN_PHOTO_URI, r.getPhotoUri());
-        values.put(SeriesRecordings.COLUMN_STATE, seriesRecordingCanceled(r.getState()));
+        values.put(SeriesRecordings.COLUMN_STATE, seriesRecordingState(r.getState()));
         return values;
     }
 
@@ -244,22 +244,22 @@ public class SeriesRecording implements Parcelable {
         return OPTION_CHANNEL_ONE;
     }
 
-    private static String seriesRecordingCanceled(@SeriesState int state) {
+    private static String seriesRecordingState(@SeriesState int state) {
         switch (state) {
             case STATE_SERIES_NORMAL:
                 return SeriesRecordings.STATE_SERIES_NORMAL;
-            case STATE_SERIES_CANCELED:
-                return SeriesRecordings.STATE_SERIES_CANCELED;
+            case STATE_SERIES_STOPPED:
+                return SeriesRecordings.STATE_SERIES_STOPPED;
         }
         return SeriesRecordings.STATE_SERIES_NORMAL;
     }
 
-    @SeriesState private static int seriesRecordingCanceled(String state) {
+    @SeriesState private static int seriesRecordingState(String state) {
         switch (state) {
             case SeriesRecordings.STATE_SERIES_NORMAL:
                 return STATE_SERIES_NORMAL;
-            case SeriesRecordings.STATE_SERIES_CANCELED:
-                return STATE_SERIES_CANCELED;
+            case SeriesRecordings.STATE_SERIES_STOPPED:
+                return STATE_SERIES_STOPPED;
         }
         return STATE_SERIES_NORMAL;
     }
@@ -331,6 +331,7 @@ public class SeriesRecording implements Parcelable {
             mInputId = inputId;
             return this;
         }
+
         /**
          * @see #getChannelId()
          */
@@ -478,7 +479,7 @@ public class SeriesRecording implements Parcelable {
     }
 
     /**
-     * The channelId to match.
+     * The channelId to match. The channel ID might not be valid when the channel option is "ALL".
      */
     public long getChannelId() {
         return mChannelId;
@@ -534,7 +535,6 @@ public class SeriesRecording implements Parcelable {
      *
      * <p>SeriesId is an opaque but stable string.
      */
-    @NonNull
     public String getSeriesId() {
         return mSeriesId;
     }
@@ -588,6 +588,13 @@ public class SeriesRecording implements Parcelable {
      */
     @SeriesState public int getState() {
         return mState;
+    }
+
+    /**
+     * Checks whether the series recording is stopped or not.
+     */
+    public boolean isStopped() {
+        return mState == STATE_SERIES_STOPPED;
     }
 
     @Override
@@ -695,7 +702,7 @@ public class SeriesRecording implements Parcelable {
      * episode constraints.
      */
     public boolean matchProgram(Program program) {
-        return matchProgram(program, true);
+        return matchProgram(program, mChannelOption);
     }
 
     /**
@@ -703,13 +710,12 @@ public class SeriesRecording implements Parcelable {
      * episode constraints. It checks the channel option only if {@code checkChannelOption} is
      * {@code true}.
      */
-    public boolean matchProgram(Program program, boolean checkChannelOption) {
+    public boolean matchProgram(Program program, @ChannelOption int channelOption) {
         String seriesId = program.getSeriesId();
         long channelId = program.getChannelId();
         String seasonNumber = program.getSeasonNumber();
         String episodeNumber = program.getEpisodeNumber();
-        if (!mSeriesId.equals(seriesId) || (checkChannelOption
-                && mChannelOption == SeriesRecording.OPTION_CHANNEL_ONE
+        if (!mSeriesId.equals(seriesId) || (channelOption == SeriesRecording.OPTION_CHANNEL_ONE
                 && mChannelId != channelId)) {
             return false;
         }

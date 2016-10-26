@@ -37,6 +37,7 @@ import com.android.tv.dvr.RecordedProgram;
 import com.android.tv.dvr.SeriesRecording;
 import com.android.tv.ui.GuidedActionsStylistWithDivider;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -145,17 +146,19 @@ public class SeriesDeletionFragment extends GuidedStepFragment {
     public void onGuidedActionClicked(GuidedAction action) {
         long actionId = action.getId();
         if (actionId == ACTION_ID_DELETE) {
-            int deletionCount = 0;
-            DvrManager dvrManager = TvApplication.getSingletons(getActivity()).getDvrManager();
+            List<Long> idsToDelete = new ArrayList<>();
             for (GuidedAction guidedAction : getActions()) {
                 if (guidedAction.getCheckSetId() == GuidedAction.CHECKBOX_CHECK_SET_ID
                         && guidedAction.isChecked()) {
-                    dvrManager.removeRecordedProgram(guidedAction.getId());
-                    deletionCount++;
+                    idsToDelete.add(guidedAction.getId());
                 }
             }
+            if (!idsToDelete.isEmpty()) {
+                DvrManager dvrManager = TvApplication.getSingletons(getActivity()).getDvrManager();
+                dvrManager.removeRecordedPrograms(idsToDelete);
+            }
             Toast.makeText(getContext(), getResources().getQuantityString(
-                    R.plurals.dvr_msg_episodes_deleted, deletionCount, deletionCount,
+                    R.plurals.dvr_msg_episodes_deleted, idsToDelete.size(), idsToDelete.size(),
                     mRecordings.size()), Toast.LENGTH_LONG).show();
             finishGuidedStepFragments();
         } else if (actionId == GuidedAction.ACTION_ID_CANCEL) {

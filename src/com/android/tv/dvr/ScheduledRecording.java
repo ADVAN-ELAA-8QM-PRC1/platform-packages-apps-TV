@@ -31,6 +31,7 @@ import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
 import com.android.tv.data.Program;
 import com.android.tv.dvr.provider.DvrContract.Schedules;
+import com.android.tv.util.CompositeComparator;
 import com.android.tv.util.Utils;
 
 import java.lang.annotation.Retention;
@@ -56,6 +57,9 @@ public final class ScheduledRecording implements Parcelable {
      */
     public static final long DEFAULT_PRIORITY = Long.MAX_VALUE >> 1;
 
+    /**
+     * Compares the start time in ascending order.
+     */
     public static final Comparator<ScheduledRecording> START_TIME_COMPARATOR
             = new Comparator<ScheduledRecording>() {
         @Override
@@ -65,7 +69,7 @@ public final class ScheduledRecording implements Parcelable {
     };
 
     /**
-     * Compare the end time in ascending order.
+     * Compares the end time in ascending order.
      */
     public static final Comparator<ScheduledRecording> END_TIME_COMPARATOR
             = new Comparator<ScheduledRecording>() {
@@ -76,32 +80,34 @@ public final class ScheduledRecording implements Parcelable {
     };
 
     /**
-     * Compare priority in descending order.
+     * Compares ID in ascending order. The schedule with the larger ID was created later.
+     */
+    public static final Comparator<ScheduledRecording> ID_COMPARATOR
+            = new Comparator<ScheduledRecording>() {
+        @Override
+        public int compare(ScheduledRecording lhs, ScheduledRecording rhs) {
+            return Long.compare(lhs.mId, rhs.mId);
+        }
+    };
+
+    /**
+     * Compares the priority in ascending order.
      */
     public static final Comparator<ScheduledRecording> PRIORITY_COMPARATOR
             = new Comparator<ScheduledRecording>() {
         @Override
         public int compare(ScheduledRecording lhs, ScheduledRecording rhs) {
-            int value = Long.compare(rhs.mPriority, lhs.mPriority);
-            if (value == 0) {
-                // New recording has the higher priority.
-                value = Long.compare(rhs.mId, lhs.mId);
-            }
-            return value;
+            return Long.compare(lhs.mPriority, rhs.mPriority);
         }
     };
 
-    public static final Comparator<ScheduledRecording> START_TIME_THEN_PRIORITY_COMPARATOR
-            = new Comparator<ScheduledRecording>() {
-        @Override
-        public int compare(ScheduledRecording lhs, ScheduledRecording rhs) {
-            int value = START_TIME_COMPARATOR.compare(lhs, rhs);
-            if (value == 0) {
-                value = PRIORITY_COMPARATOR.compare(lhs, rhs);
-            }
-            return value;
-        }
-    };
+    /**
+     * Compares start time in ascending order and then priority in descending order and then ID in
+     * descending order.
+     */
+    public static final Comparator<ScheduledRecording> START_TIME_THEN_PRIORITY_THEN_ID_COMPARATOR
+            = new CompositeComparator<>(START_TIME_COMPARATOR, PRIORITY_COMPARATOR.reversed(),
+            ID_COMPARATOR.reversed());
 
     /**
      * Builds scheduled recordings from programs.
@@ -285,6 +291,7 @@ public final class ScheduledRecording implements Parcelable {
                 .setChannelId(orig.mChannelId)
                 .setEndTimeMs(orig.mEndTimeMs)
                 .setSeriesRecordingId(orig.mSeriesRecordingId)
+                .setPriority(orig.mPriority)
                 .setProgramId(orig.mProgramId)
                 .setProgramTitle(orig.mProgramTitle)
                 .setStartTimeMs(orig.mStartTimeMs)
@@ -766,6 +773,13 @@ public final class ScheduledRecording implements Parcelable {
         return mStartTimeMs < period.getUpper() && mEndTimeMs > period.getLower();
     }
 
+    /**
+     * Checks if the {@code schedule} overlaps with this schedule.
+     */
+    public boolean isOverLapping(ScheduledRecording schedule) {
+        return mStartTimeMs < schedule.getEndTimeMs() && mEndTimeMs > schedule.getStartTimeMs();
+    }
+
     @Override
     public String toString() {
         return "ScheduledRecording[" + mId
@@ -775,8 +789,8 @@ public final class ScheduledRecording implements Parcelable {
                 + ",programId=" + mProgramId
                 + ",programTitle=" + mProgramTitle
                 + ",type=" + mType
-                + ",startTime=" + Utils.toIsoDateTimeString(mStartTimeMs)
-                + ",endTime=" + Utils.toIsoDateTimeString(mEndTimeMs)
+                + ",startTime=" + Utils.toIsoDateTimeString(mStartTimeMs) + "(" + mStartTimeMs + ")"
+                + ",endTime=" + Utils.toIsoDateTimeString(mEndTimeMs) + "(" + mEndTimeMs + ")"
                 + ",seasonNumber=" + mSeasonNumber
                 + ",episodeNumber=" + mEpisodeNumber
                 + ",episodeTitle=" + mEpisodeTitle

@@ -17,6 +17,7 @@
 package com.android.tv.guide;
 
 import static com.android.tv.util.ImageLoader.ImageLoaderCallback;
+
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
@@ -42,6 +43,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewTreeObserver;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -50,10 +53,10 @@ import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.data.Channel;
-import com.android.tv.data.Program.CriticScore;
 import com.android.tv.data.Program;
-import com.android.tv.dvr.DvrManager;
+import com.android.tv.data.Program.CriticScore;
 import com.android.tv.dvr.DvrDataManager;
+import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.guide.ProgramManager.TableEntriesUpdatedListener;
 import com.android.tv.parental.ParentalControlSettings;
@@ -80,6 +83,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
     private final DvrManager mDvrManager;
     private final DvrDataManager mDvrDataManager;
     private final ProgramManager mProgramManager;
+    private final AccessibilityManager mAccessibilityManager;
     private final ProgramGuide mProgramGuide;
     private final Handler mHandler = new Handler();
     private final List<ProgramListAdapter> mProgramListAdapters = new ArrayList<>();
@@ -103,6 +107,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
     private final String mProgramRecordableText;
     private final String mRecordingScheduledText;
     private final String mRecordingConflictText;
+    private final String mRecordingFailedText;
     private final String mRecordingInProgressText;
     private final int mDvrPaddingStartWithTrack;
     private final int mDvrPaddingStartWithOutTrack;
@@ -110,6 +115,8 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
     public ProgramTableAdapter(Context context, ProgramManager programManager,
             ProgramGuide programGuide) {
         mContext = context;
+        mAccessibilityManager =
+                (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
         mTvInputManagerHelper = TvApplication.getSingletons(context).getTvInputManagerHelper();
         if (CommonFeatures.DVR.isEnabled(context)) {
             mDvrManager = TvApplication.getSingletons(context).getDvrManager();
@@ -149,6 +156,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
         mProgramRecordableText = res.getString(R.string.dvr_epg_program_recordable);
         mRecordingScheduledText = res.getString(R.string.dvr_epg_program_recording_scheduled);
         mRecordingConflictText = res.getString(R.string.dvr_epg_program_recording_conflict);
+        mRecordingFailedText = res.getString(R.string.dvr_epg_program_recording_failed);
         mRecordingInProgressText = res.getString(R.string.dvr_epg_program_recording_in_progress);
         mDvrPaddingStartWithTrack = res.getDimensionPixelOffset(
                 R.dimen.program_guide_table_detail_dvr_margin_start);
@@ -162,7 +170,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
         mEpisodeTitleStyle = new TextAppearanceSpan(null, 0, episodeTitleSize,
                 episodeTitleColor, null);
 
-        mCriticScoreViews = new ArrayList<LinearLayout>();
+        mCriticScoreViews = new ArrayList<>();
         mRecycledViewPool = new RecycledViewPool();
         mRecycledViewPool.setMaxRecycledViews(R.layout.program_guide_table_item,
                 context.getResources().getInteger(
@@ -170,12 +178,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
         mProgramManager.addListener(new ProgramManager.ListenerAdapter() {
             @Override
             public void onChannelsUpdated() {
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        update();
-                    }
-                });
+                update();
             }
         });
         update();
@@ -238,6 +241,16 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
         notifyItemChanged(channelIndex, true);
     }
 
+    @Override
+    public void onViewAttachedToWindow(ProgramRowHolder holder) {
+        holder.onAttachedToWindow();
+    }
+
+    @Override
+    public void onViewDetachedFromWindow(ProgramRowHolder holder) {
+        holder.onDetachedFromWindow();
+    }
+
     // TODO: make it static
     public class ProgramRowHolder extends RecyclerView.ViewHolder
             implements ProgramRow.ChildFocusListener {
@@ -264,6 +277,15 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
                 onHorizontalScrolled();
             }
         };
+
+        private final ViewTreeObserver.OnGlobalFocusChangeListener mGlobalFocusChangeListener =
+                new ViewTreeObserver.OnGlobalFocusChangeListener() {
+                    @Override
+                    public void onGlobalFocusChanged(View oldFocus, View newFocus) {
+                        onChildFocus(isChild(oldFocus) ? oldFocus : null,
+                                isChild(newFocus) ? newFocus : null);
+                    }
+                };
 
         // Members of Program Details
         private final ViewGroup mDetailView;
@@ -317,6 +339,16 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
             mChannelLogoView = (ImageView) mContainer.findViewById(R.id.channel_logo);
             mChannelBlockView = (ImageView) mContainer.findViewById(R.id.channel_block);
             mInputLogoView = (ImageView) mContainer.findViewById(R.id.input_logo);
+            mDetailView.setFocusable(mAccessibilityManager.isEnabled());
+            mChannelHeaderView.setFocusable(mAccessibilityManager.isEnabled());
+            mAccessibilityManager.addAccessibilityStateChangeListener(
+                    new AccessibilityManager.AccessibilityStateChangeListener() {
+                        @Override
+                        public void onAccessibilityStateChanged(boolean enable) {
+                            mDetailView.setFocusable(enable);
+                            mChannelHeaderView.setFocusable(enable);
+                        }
+                    });
         }
 
         public void onBind(int position) {
@@ -384,12 +416,32 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
             }
         }
 
+        public boolean isChild(View view) {
+            if (view == null) {
+                return false;
+            }
+            for (ViewParent p = view.getParent(); p != null; p = p.getParent()) {
+                if (p == mContainer) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         @Override
         public void onChildFocus(View oldFocus, View newFocus) {
             if (newFocus == null) {
                 return;
             }
-            mSelectedEntry = ((ProgramItemView) newFocus).getTableEntry();
+            // When the accessibility service is enabled, focus might be put on channel's header or
+            // detail view, besides program items.
+            if (newFocus == mChannelHeaderView) {
+                mSelectedEntry = ((ProgramItemView) mProgramRow.getChildAt(0)).getTableEntry();
+            } else if (newFocus == mDetailView) {
+                return;
+            } else {
+                mSelectedEntry = ((ProgramItemView) newFocus).getTableEntry();
+            }
             if (oldFocus == null) {
                 updateDetailView();
                 return;
@@ -456,7 +508,21 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
                     });
         }
 
+        private void onAttachedToWindow() {
+            mContainer.getViewTreeObserver()
+                    .addOnGlobalFocusChangeListener(mGlobalFocusChangeListener);
+        }
+
+        private void onDetachedFromWindow() {
+            mContainer.getViewTreeObserver()
+                    .removeOnGlobalFocusChangeListener(mGlobalFocusChangeListener);
+        }
+
         private void updateDetailView() {
+            if (mSelectedEntry == null) {
+                // The view holder is never on focus before.
+                return;
+            }
             if (DEBUG) Log.d(TAG, "updateDetailView");
             mCriticScoresLayout.removeAllViews();
             if (Program.isValid(mSelectedEntry.program)) {
@@ -508,7 +574,7 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
                     int iconResId = 0;
                     if (scheduledRecording != null) {
                         if (mDvrManager.isConflicting(scheduledRecording)) {
-                            iconResId = R.drawable.ic_warning_white_24dp;
+                            iconResId = R.drawable.ic_warning_white_12dp;
                             statusText = mRecordingConflictText;
                         } else {
                             switch (scheduledRecording.getState()) {
@@ -521,8 +587,8 @@ public class ProgramTableAdapter extends RecyclerView.Adapter<ProgramTableAdapte
                                     statusText = mRecordingScheduledText;
                                     break;
                                 case ScheduledRecording.STATE_RECORDING_FAILED:
-                                    iconResId = R.drawable.ic_warning_white_24dp;
-                                    statusText = mRecordingConflictText;
+                                    iconResId = R.drawable.ic_warning_white_12dp;
+                                    statusText = mRecordingFailedText;
                                     break;
                                 default:
                                     iconResId = 0;

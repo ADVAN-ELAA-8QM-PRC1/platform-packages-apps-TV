@@ -233,9 +233,9 @@ public final class DvrContract {
         public static final String STATE_SERIES_NORMAL = "STATE_SERIES_NORMAL";
 
         /**
-         * The state indicates that it is a canceled one.
+         * The state indicates that it is stopped.
          */
-        public static final String STATE_SERIES_CANCELED = "STATE_SERIES_CANCELED";
+        public static final String STATE_SERIES_STOPPED = "STATE_SERIES_STOPPED";
 
         /**
          * The priority of this recording.
@@ -380,7 +380,7 @@ public final class DvrContract {
          * The state of whether the series recording be canceled or not.
          *
          * <p>This value should be one of the followings: {@link #STATE_SERIES_NORMAL} and
-         * {@link #STATE_SERIES_CANCELED}. The default value is STATE_SERIES_NORMAL.
+         * {@link #STATE_SERIES_STOPPED}. The default value is STATE_SERIES_NORMAL.
          *
          * <p>Type: TEXT
          */

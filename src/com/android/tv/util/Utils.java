@@ -37,6 +37,7 @@ import android.support.annotation.VisibleForTesting;
 import android.support.annotation.WorkerThread;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
+import android.util.ArraySet;
 import android.util.Log;
 import android.view.View;
 
@@ -77,7 +78,6 @@ public class Utils {
     public static final String EXTRA_KEY_ACTION = "action";
     public static final String EXTRA_ACTION_SHOW_TV_INPUT ="show_tv_input";
     public static final String EXTRA_KEY_FROM_LAUNCHER = "from_launcher";
-    public static final String EXTRA_KEY_RECORDING_URI = "recording_uri";
     public static final String EXTRA_KEY_RECORDED_PROGRAM_ID = "recorded_program_id";
     public static final String EXTRA_KEY_RECORDED_PROGRAM_SEEK_TIME = "recorded_program_seek_time";
     public static final String EXTRA_KEY_RECORDED_PROGRAM_PIN_CHECKED =
@@ -119,7 +119,7 @@ public class Utils {
     // Hardcoded list for known bundled inputs not written by OEM/SOCs.
     // Bundled (system) inputs not in the list will get the high priority
     // so they and their channels come first in the UI.
-    private static final Set<String> BUNDLED_PACKAGE_SET = new HashSet<>();
+    private static final Set<String> BUNDLED_PACKAGE_SET = new ArraySet<>();
 
     static {
         BUNDLED_PACKAGE_SET.add("com.android.tv");
@@ -800,6 +800,18 @@ public class Utils {
      */
     public static boolean isInBundledPackageSet(String packageName) {
         return BUNDLED_PACKAGE_SET.contains(packageName);
+    }
+
+    /**
+     * Checks whether a given input is a bundled input.
+     */
+    public static boolean isBundledInput(String inputId) {
+        for (String prefix : BUNDLED_PACKAGE_SET) {
+            if (inputId.startsWith(prefix + "/")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

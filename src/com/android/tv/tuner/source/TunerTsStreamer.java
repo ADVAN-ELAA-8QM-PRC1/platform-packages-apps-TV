@@ -16,11 +16,15 @@
 
 package com.android.tv.tuner.source;
 
+import android.content.Context;
 import android.util.Log;
 
+import com.google.android.exoplayer.C;
+import com.google.android.exoplayer.upstream.DataSpec;
 import com.android.tv.common.SoftPreconditions;
 import com.android.tv.tuner.ChannelScanFileParser;
 import com.android.tv.tuner.TunerHal;
+import com.android.tv.tuner.TunerPreferences;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.tvinput.EventDetector;
 import com.android.tv.tuner.tvinput.EventDetector.EventListener;
@@ -42,11 +46,6 @@ public class TunerTsStreamer implements TsStreamer {
     private static final int READ_TIMEOUT_MS = 5000; // 5 secs.
     private static final int BUFFER_UNDERRUN_SLEEP_MS = 10;
 
-    private static final int BUFFER_KEY_VERSION = 1;
-
-    // UTCK stands for USB Tuner Buffer Key.
-    private static final String BUFFER_KEY_PREFIX = "UTCK";
-
     private final Object mCircularBufferMonitor = new Object();
     private final byte[] mCircularBuffer = new byte[CIRCULAR_BUFFER_SIZE];
     private long mBytesFetched;
@@ -59,28 +58,16 @@ public class TunerTsStreamer implements TsStreamer {
     private Thread mStreamingThread;
     private final EventDetector mEventDetector;
 
-    public static class TunerMediaDataSource extends TsMediaDataSource {
+    private final TsStreamWriter mTsStreamWriter;
+
+    public static class TunerDataSource extends TsDataSource {
         private final TunerTsStreamer mTsStreamer;
         private final AtomicLong mLastReadPosition = new AtomicLong(0);
         private long mStartBufferedPosition;
 
-        private TunerMediaDataSource(TunerTsStreamer tsStreamer) {
+        private TunerDataSource(TunerTsStreamer tsStreamer) {
             mTsStreamer = tsStreamer;
             mStartBufferedPosition = tsStreamer.getBufferedPosition();
-        }
-
-        @Override
-        public int readAt(long pos, byte[] buffer, int offset, int amount) throws IOException {
-            int ret = mTsStreamer.readAt(mStartBufferedPosition + pos, buffer, offset, amount);
-            if (ret > 0) {
-                mLastReadPosition.set(pos + ret);
-            }
-            return ret;
-        }
-
-        @Override
-        public long getSize() {
-            return -1L;
         }
 
         @Override
@@ -100,9 +87,24 @@ public class TunerTsStreamer implements TsStreamer {
             mStartBufferedPosition += offset;
         }
 
-        // This will be called by {@link MediaExtractor}
+        @Override
+        public long open(DataSpec dataSpec) throws IOException {
+            mLastReadPosition.set(0);
+            return C.LENGTH_UNBOUNDED;
+        }
+
         @Override
         public void close() {
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int readLength) throws IOException {
+            int ret = mTsStreamer.readAt(mStartBufferedPosition + mLastReadPosition.get(), buffer,
+                    offset, readLength);
+            if (ret > 0) {
+                mLastReadPosition.addAndGet(ret);
+            }
+            return ret;
         }
     }
     /**
@@ -110,9 +112,15 @@ public class TunerTsStreamer implements TsStreamer {
      * @param tunerHal the HAL for tuner device
      * @param eventListener the listener for channel & program information
      */
-    public TunerTsStreamer(TunerHal tunerHal, EventListener eventListener) {
+    public TunerTsStreamer(TunerHal tunerHal, EventListener eventListener, Context context) {
         mTunerHal = tunerHal;
         mEventDetector = new EventDetector(mTunerHal, eventListener);
+        mTsStreamWriter = context != null && TunerPreferences.getStoreTsStream(context) ?
+                new TsStreamWriter(context) : null;
+    }
+
+    public TunerTsStreamer(TunerHal tunerHal, EventListener eventListener) {
+        this(tunerHal, eventListener, null);
     }
 
     @Override
@@ -122,9 +130,16 @@ public class TunerTsStreamer implements TsStreamer {
                 mTunerHal.addPidFilter(channel.getVideoPid(),
                         TunerHal.FILTER_TYPE_VIDEO);
             }
-            if (channel.hasAudio()) {
-                mTunerHal.addPidFilter(channel.getAudioPid(),
-                        TunerHal.FILTER_TYPE_AUDIO);
+            boolean audioFilterSet = false;
+            for (Integer audioPid : channel.getAudioPids()) {
+                if (!audioFilterSet) {
+                    mTunerHal.addPidFilter(audioPid, TunerHal.FILTER_TYPE_AUDIO);
+                    audioFilterSet = true;
+                } else {
+                    // FILTER_TYPE_AUDIO overrides the previous filter for audio. We use
+                    // FILTER_TYPE_OTHER from the secondary one to get the all audio tracks.
+                    mTunerHal.addPidFilter(audioPid, TunerHal.FILTER_TYPE_OTHER);
+                }
             }
             mTunerHal.addPidFilter(channel.getPcrPid(),
                     TunerHal.FILTER_TYPE_PCR);
@@ -142,6 +157,10 @@ public class TunerTsStreamer implements TsStreamer {
                 mBytesFetched = 0;
                 mLastReadPosition.set(0L);
                 mEndOfStreamSent = false;
+            }
+            if (mTsStreamWriter != null) {
+                mTsStreamWriter.setChannel(mChannel);
+                mTsStreamWriter.openFile();
             }
             mStreamingThread = new StreamingThread();
             mStreamingThread.start();
@@ -193,11 +212,15 @@ public class TunerTsStreamer implements TsStreamer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+        if (mTsStreamWriter != null) {
+            mTsStreamWriter.closeFile(true);
+            mTsStreamWriter.setChannel(null);
+        }
     }
 
     @Override
-    public TsMediaDataSource createMediaDataSource() {
-        return new TunerMediaDataSource(this);
+    public TsDataSource createDataSource() {
+        return new TunerDataSource(this);
     }
 
     /**
@@ -258,6 +281,10 @@ public class TunerTsStreamer implements TsStreamer {
                         Thread.currentThread().interrupt();
                     }
                     continue;
+                }
+
+                if (mTsStreamWriter != null) {
+                    mTsStreamWriter.writeToFile(dataBuffer, bytesWritten);
                 }
 
                 if (mEventDetector != null) {

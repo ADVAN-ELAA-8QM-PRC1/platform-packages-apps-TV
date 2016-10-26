@@ -20,16 +20,20 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
 import android.support.v17.leanback.app.GuidedStepFragment;
+import android.support.v17.leanback.widget.GuidedAction;
+import android.support.v17.leanback.widget.GuidanceStylist.Guidance;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.android.tv.MainActivity;
 import com.android.tv.R;
-import com.android.tv.data.ParcelableList;
+import com.android.tv.dvr.DvrStorageStatusManager;
 import com.android.tv.dvr.ui.DvrConflictFragment.DvrChannelWatchConflictFragment;
 import com.android.tv.dvr.ui.DvrConflictFragment.DvrProgramConflictFragment;
 import com.android.tv.guide.ProgramGuide;
+
+import java.util.List;
 
 public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     /**
@@ -42,11 +46,6 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
      * Type: {@link com.android.tv.data.Program}.
      */
     public static final String KEY_PROGRAM = "DvrHalfSizedDialogFragment.program";
-    /**
-     * Key for the programs.
-     * Type: {@link ParcelableList}.
-     */
-    public static final String KEY_PROGRAMS = "DvrHalfSizedDialogFragment.programs";
     /**
      * Key for the channel ID.
      * Type: long.
@@ -90,23 +89,35 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     }
 
     public abstract static class DvrGuidedStepDialogFragment extends DvrHalfSizedDialogFragment {
+        private DvrGuidedStepFragment mFragment;
+
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container,
                 Bundle savedInstanceState) {
             View view = super.onCreateView(inflater, container, savedInstanceState);
-            GuidedStepFragment fragment = onCreateGuidedStepFragment();
-            fragment.setArguments(getArguments());
-            GuidedStepFragment.add(getChildFragmentManager(), fragment, R.id.halfsized_dialog_host);
+            mFragment = onCreateGuidedStepFragment();
+            mFragment.setArguments(getArguments());
+            mFragment.setOnActionClickListener(getOnActionClickListener());
+            GuidedStepFragment.add(getChildFragmentManager(),
+                    mFragment, R.id.halfsized_dialog_host);
             return view;
         }
 
-        protected abstract GuidedStepFragment onCreateGuidedStepFragment();
+        @Override
+        public void setOnActionClickListener(OnActionClickListener listener) {
+            super.setOnActionClickListener(listener);
+            if (mFragment != null) {
+                mFragment.setOnActionClickListener(listener);
+            }
+        }
+
+        protected abstract DvrGuidedStepFragment onCreateGuidedStepFragment();
     }
 
     /** A dialog fragment for {@link DvrScheduleFragment}. */
     public static class DvrScheduleDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrScheduleFragment();
         }
     }
@@ -114,7 +125,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     /** A dialog fragment for {@link DvrProgramConflictFragment}. */
     public static class DvrProgramConflictDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrProgramConflictFragment();
         }
     }
@@ -122,7 +133,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     /** A dialog fragment for {@link DvrChannelWatchConflictFragment}. */
     public static class DvrChannelWatchConflictDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrChannelWatchConflictFragment();
         }
     }
@@ -131,7 +142,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     public static class DvrChannelRecordDurationOptionDialogFragment
             extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrChannelRecordDurationOptionFragment();
         }
     }
@@ -140,7 +151,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     public static class DvrInsufficientSpaceErrorDialogFragment
             extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrInsufficientSpaceErrorFragment();
         }
     }
@@ -149,15 +160,52 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     public static class DvrMissingStorageErrorDialogFragment
             extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrMissingStorageErrorFragment();
+        }
+    }
+
+    /**
+     * A dialog fragment to show error message when the current storage is too small to
+     * support DVR
+     */
+    public static class DvrSmallSizedStorageErrorDialogFragment
+            extends DvrGuidedStepDialogFragment {
+        @Override
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
+            return new DvrGuidedStepFragment() {
+                @Override
+                public Guidance onCreateGuidance(Bundle savedInstanceState) {
+                    String title = getResources().getString(
+                            R.string.dvr_error_small_sized_storage_title);
+                    String description = getResources().getString(
+                            R.string.dvr_error_small_sized_storage_description,
+                            DvrStorageStatusManager.MIN_STORAGE_SIZE_FOR_DVR_IN_BYTES / 1024
+                                    / 1024 / 1024);
+                    return new Guidance(title, description, null, null);
+                }
+
+                @Override
+                public void onCreateActions(List<GuidedAction> actions, Bundle savedInstanceState) {
+                    Activity activity = getActivity();
+                    actions.add(new GuidedAction.Builder(activity)
+                            .id(GuidedAction.ACTION_ID_OK)
+                            .title(android.R.string.ok)
+                            .build());
+                }
+
+                @Override
+                public void onGuidedActionClicked(GuidedAction action) {
+                    dismissDialog();
+                }
+            };
         }
     }
 
     /** A dialog fragment for {@link DvrStopRecordingFragment}. */
     public static class DvrStopRecordingDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrStopRecordingFragment();
         }
     }
@@ -165,7 +213,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     /** A dialog fragment for {@link DvrAlreadyScheduledFragment}. */
     public static class DvrAlreadyScheduledDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrAlreadyScheduledFragment();
         }
     }
@@ -173,7 +221,7 @@ public class DvrHalfSizedDialogFragment extends HalfSizedDialogFragment {
     /** A dialog fragment for {@link DvrAlreadyRecordedFragment}. */
     public static class DvrAlreadyRecordedDialogFragment extends DvrGuidedStepDialogFragment {
         @Override
-        protected GuidedStepFragment onCreateGuidedStepFragment() {
+        protected DvrGuidedStepFragment onCreateGuidedStepFragment() {
             return new DvrAlreadyRecordedFragment();
         }
     }

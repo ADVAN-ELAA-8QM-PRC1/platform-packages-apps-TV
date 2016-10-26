@@ -150,11 +150,6 @@ public final class Channel {
 
     private long mDvrId;
 
-    /**
-     * TODO(DVR): Need to fill the following data.
-     */
-    private boolean mRecordable;
-
     private Channel() {
         // Do nothing.
     }
@@ -566,6 +561,8 @@ public final class Channel {
                             getUri().toString());
                     mAppLinkType = APP_LINK_TYPE_CHANNEL;
                     return;
+                } else {
+                    Log.w(TAG, "No activity exists to handle : " + mAppLinkIntentUri);
                 }
             } catch (URISyntaxException e) {
                 Log.w(TAG, "Unable to set app link for " + mAppLinkIntentUri, e);

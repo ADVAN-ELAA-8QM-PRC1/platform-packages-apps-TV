@@ -7,6 +7,11 @@ import android.content.pm.PackageManager;
  * Util class to handle permissions.
  */
 public class PermissionUtils {
+    /**
+     * Permission to read the TV listings.
+     */
+    public static final String PERMISSION_READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS";
+
     private static Boolean sHasAccessAllEpgPermission;
     private static Boolean sHasAccessWatchedHistoryPermission;
     private static Boolean sHasModifyParentalControlsPermission;
@@ -39,7 +44,7 @@ public class PermissionUtils {
     }
 
     public static boolean hasReadTvListings(Context context) {
-        return context.checkSelfPermission("android.permission.READ_TV_LISTINGS")
+        return context.checkSelfPermission(PERMISSION_READ_TV_LISTINGS)
                 == PackageManager.PERMISSION_GRANTED;
     }
 }

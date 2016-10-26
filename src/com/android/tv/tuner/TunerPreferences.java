@@ -41,6 +41,7 @@ public class TunerPreferences {
     private static final String PREFS_KEY_SCANNED_CHANNEL_COUNT = "scanned_channel_count";
     private static final String PREFS_KEY_SCAN_DONE = "scan_done";
     private static final String PREFS_KEY_LAUNCH_SETUP = "launch_setup";
+    private static final String PREFS_KEY_STORE_TS_STREAM = "store_ts_stream";
 
     private static final String SHARED_PREFS_NAME = "com.android.tv.tuner.preferences";
 
@@ -202,6 +203,28 @@ public class TunerPreferences {
         }
     }
 
+    @MainThread
+    public static boolean getStoreTsStream(Context context) {
+        SoftPreconditions.checkState(sInitialized);
+        if (useContentProvider(context)) {
+            return sPreferenceValues.getBoolean(PREFS_KEY_STORE_TS_STREAM, false);
+        } else {
+            return getSharedPreferences(context)
+                    .getBoolean(TunerPreferences.PREFS_KEY_STORE_TS_STREAM, false);
+        }
+    }
+
+    @MainThread
+    public static void setStoreTsStream(Context context, boolean shouldStore) {
+        if (useContentProvider(context)) {
+            setPreference(context, PREFS_KEY_STORE_TS_STREAM, shouldStore);
+        } else {
+            getSharedPreferences(context).edit()
+                    .putBoolean(TunerPreferences.PREFS_KEY_STORE_TS_STREAM, shouldStore)
+                    .apply();
+        }
+    }
+
     private static SharedPreferences getSharedPreferences(Context context) {
         return context.getSharedPreferences(SHARED_PREFS_NAME, Context.MODE_PRIVATE);
     }
@@ -266,6 +289,7 @@ public class TunerPreferences {
                                 break;
                             case PREFS_KEY_SCAN_DONE:
                             case PREFS_KEY_LAUNCH_SETUP:
+                            case PREFS_KEY_STORE_TS_STREAM:
                                 bundle.putBoolean(key, Boolean.parseBoolean(value));
                                 break;
                         }

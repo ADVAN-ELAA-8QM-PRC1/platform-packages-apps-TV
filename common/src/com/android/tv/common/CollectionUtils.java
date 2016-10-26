@@ -60,7 +60,7 @@ public class CollectionUtils {
         Collections.sort(result, comparator);
         List<T> resultToAdd = new ArrayList<>();
         for (T toAdd : toAdds) {
-            if (Collections.binarySearch(result, toAdd, comparator) != 0) {
+            if (Collections.binarySearch(result, toAdd, comparator) < 0) {
                 resultToAdd.add(toAdd);
             }
         }
@@ -77,7 +77,7 @@ public class CollectionUtils {
         Collections.sort(result, comparator);
         for (T toSubtract : toSubtracts) {
             int index = Collections.binarySearch(result, toSubtract, comparator);
-            if (index != -1) {
+            if (index >= 0) {
                 result.remove(index);
             }
         }
@@ -92,7 +92,7 @@ public class CollectionUtils {
         List<T> contains = new ArrayList<>(c1);
         Collections.sort(contains, comparator);
         for (T iterate : c2) {
-            if (Collections.binarySearch(contains, iterate, comparator) != -1) {
+            if (Collections.binarySearch(contains, iterate, comparator) >= 0) {
                 return true;
             }
         }

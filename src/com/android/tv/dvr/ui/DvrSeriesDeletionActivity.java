@@ -37,6 +37,7 @@ public class DvrSeriesDeletionActivity extends Activity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        TvApplication.setCurrentRunningProcess(this, true);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dvr_series_settings);
         // Check savedInstanceState to prevent that activity is being showed with animation.

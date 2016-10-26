@@ -44,9 +44,13 @@ interface WritableDvrDataManager extends DvrDataManager {
     void removeScheduledRecording(ScheduledRecording... scheduledRecordings);
 
     /**
+     * Removes recordings. If {@code forceRemove} is {@code true}, the schedule will be permanently
+     * removed instead of changing the state to DELETED.
+     */
+    void removeScheduledRecording(boolean forceRemove, ScheduledRecording... scheduledRecordings);
+
+    /**
      * Removes series recordings.
-     *
-     * <p>Note that the finished or failed schedules are not deleted.
      */
     void removeSeriesRecording(SeriesRecording... seasonSchedules);
 
@@ -64,4 +68,11 @@ interface WritableDvrDataManager extends DvrDataManager {
      * Changes the state of the recording.
      */
     void changeState(ScheduledRecording scheduledRecording, @RecordingState int newState);
+
+    /**
+     * Remove all the records related to the input.
+     * <p>
+     * Note that this should be called after the input was removed.
+     */
+    void forgetStorage(String inputId);
 }

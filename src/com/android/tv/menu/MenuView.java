@@ -24,6 +24,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver.OnGlobalFocusChangeListener;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.widget.FrameLayout;
 
 import com.android.tv.menu.Menu.MenuShowReason;
@@ -57,6 +58,8 @@ public class MenuView extends FrameLayout implements IMenuView {
     public MenuView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         mLayoutInflater = LayoutInflater.from(context);
+        // Set hardware layer type for smooth animation of lots of views.
+        setLayerType(LAYER_TYPE_HARDWARE, null);
         getViewTreeObserver().addOnGlobalFocusChangeListener(new OnGlobalFocusChangeListener() {
             @Override
             public void onGlobalFocusChanged(View oldFocus, View newFocus) {
@@ -129,7 +132,15 @@ public class MenuView extends FrameLayout implements IMenuView {
         // Make the selected row have the focus.
         requestFocus();
         if (runnableAfterShow != null) {
-            runnableAfterShow.run();
+            getViewTreeObserver().addOnGlobalLayoutListener(new OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    // Start show animation after layout finishes for smooth animation because the
+                    // layout can take long time.
+                    runnableAfterShow.run();
+                }
+            });
         }
         mLayoutManager.onMenuShow();
     }
@@ -181,6 +192,16 @@ public class MenuView extends FrameLayout implements IMenuView {
             return mMenuRowViews.get(selectedPosition).requestFocus();
         }
         return super.onRequestFocusInDescendants(direction, previouslyFocusedRect);
+    }
+
+    @Override
+    public void focusableViewAvailable(View v) {
+        // Workaround of b/30788222 and b/32074688.
+        // The re-layout of RecyclerView gives the focus to the card view even when the menu is not
+        // visible. Don't report focusable view when the menu is not visible.
+        if (getVisibility() == VISIBLE) {
+            super.focusableViewAvailable(v);
+        }
     }
 
     private void setSelectedPosition(int position) {

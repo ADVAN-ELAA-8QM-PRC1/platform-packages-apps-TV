@@ -17,10 +17,14 @@
 package com.android.tv.dvr.ui;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.tv.TvContentRating;
+import android.media.tv.TvInputManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v17.leanback.app.DetailsFragment;
@@ -36,11 +40,22 @@ import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.TextAppearanceSpan;
+import android.widget.Toast;
 
 import com.android.tv.R;
+import com.android.tv.TvApplication;
 import com.android.tv.data.BaseProgram;
 import com.android.tv.data.Channel;
+import com.android.tv.data.ChannelDataManager;
+import com.android.tv.dialog.PinDialogFragment;
+import com.android.tv.dvr.DvrPlaybackActivity;
+import com.android.tv.dvr.RecordedProgram;
+import com.android.tv.parental.ParentalControlSettings;
 import com.android.tv.util.ImageLoader;
+import com.android.tv.util.ToastUtils;
+import com.android.tv.util.Utils;
+
+import java.io.File;
 
 abstract class DvrDetailsFragment extends DetailsFragment {
     private static final int LOAD_LOGO_IMAGE = 1;
@@ -59,6 +74,7 @@ abstract class DvrDetailsFragment extends DetailsFragment {
         }
         mBackgroundHelper = new DetailsViewBackgroundHelper(getActivity());
         setupAdapter();
+        onCreateInternal();
     }
 
     @Override
@@ -74,8 +90,8 @@ abstract class DvrDetailsFragment extends DetailsFragment {
     }
 
     private void setupAdapter() {
-        DetailsOverviewRowPresenter rowPresenter =
-                new DetailsOverviewRowPresenter(new DetailsContentPresenter());
+        DetailsOverviewRowPresenter rowPresenter = new DetailsOverviewRowPresenter(
+                new DetailsContentPresenter(getActivity()));
         rowPresenter.setBackgroundColor(getResources().getColor(R.color.common_tv_background,
                 null));
         rowPresenter.setSharedElementEnterTransition(getActivity(),
@@ -105,11 +121,20 @@ abstract class DvrDetailsFragment extends DetailsFragment {
     /**
      * Creates and returns presenter selector will be used by rows adaptor.
      */
-    protected PresenterSelector onCreatePresenterSelector(DetailsOverviewRowPresenter rowPresenter) {
+    protected PresenterSelector onCreatePresenterSelector(
+            DetailsOverviewRowPresenter rowPresenter) {
         ClassPresenterSelector presenterSelector = new ClassPresenterSelector();
         presenterSelector.addClassPresenter(DetailsOverviewRow.class, rowPresenter);
         return presenterSelector;
     }
+
+    /**
+     * Does customized initialization of subclasses. Since {@link #onCreate(Bundle)} might finish
+     * activity early when it cannot fetch valid recordings, subclasses' onCreate method should not
+     * do anything after calling {@link #onCreate(Bundle)}. If there's something subclasses have to
+     * do after the super class did onCreate, it should override this method and put the codes here.
+     */
+    protected void onCreateInternal() { }
 
     /**
      * Updates actions of details overview.
@@ -196,6 +221,84 @@ abstract class DvrDetailsFragment extends DetailsFragment {
             ImageLoader.loadBitmap(getContext(), detailsContent.getBackgroundImageUri(),
                     new MyImageLoaderCallback(this, LOAD_BACKGROUND_IMAGE, getContext()));
         }
+    }
+
+    protected void startPlayback(RecordedProgram recordedProgram, long seekTimeMs) {
+        if (Utils.isInBundledPackageSet(recordedProgram.getPackageName()) &&
+                !isDataUriAccessible(recordedProgram.getDataUri())) {
+            // Since cleaning RecordedProgram from forgotten storage will take some time,
+            // ignore playback until cleaning is finished.
+            ToastUtils.show(getContext(),
+                    getContext().getResources().getString(R.string.dvr_toast_recording_deleted),
+                    Toast.LENGTH_SHORT);
+            return;
+        }
+        ParentalControlSettings parental = TvApplication.getSingletons(getActivity())
+                .getTvInputManagerHelper().getParentalControlSettings();
+        if (!parental.isParentalControlsEnabled()) {
+            launchPlaybackActivity(recordedProgram, seekTimeMs, false);
+            return;
+        }
+        ChannelDataManager channelDataManager =
+                TvApplication.getSingletons(getActivity()).getChannelDataManager();
+        Channel channel = channelDataManager.getChannel(recordedProgram.getChannelId());
+        if (channel != null && channel.isLocked()) {
+            checkPinToPlay(recordedProgram, seekTimeMs);
+            return;
+        }
+        String ratingString = recordedProgram.getContentRating();
+        if (TextUtils.isEmpty(ratingString)) {
+            launchPlaybackActivity(recordedProgram, seekTimeMs, false);
+            return;
+        }
+        String[] ratingList = ratingString.split(",");
+        TvContentRating[] programRatings = new TvContentRating[ratingList.length];
+        for (int i = 0; i < ratingList.length; i++) {
+            programRatings[i] = TvContentRating.unflattenFromString(ratingList[i]);
+        }
+        TvContentRating blockRatings = parental.getBlockedRating(programRatings);
+        if (blockRatings != null) {
+            checkPinToPlay(recordedProgram, seekTimeMs);
+        } else {
+            launchPlaybackActivity(recordedProgram, seekTimeMs, false);
+        }
+    }
+
+    private boolean isDataUriAccessible(Uri dataUri) {
+        if (dataUri == null || dataUri.getPath() == null) {
+            return false;
+        }
+        try {
+            File recordedProgramPath = new File(dataUri.getPath());
+            if (recordedProgramPath.exists()) {
+                return true;
+            }
+        } catch (SecurityException e) {
+        }
+        return false;
+    }
+
+    private void checkPinToPlay(RecordedProgram recordedProgram, long seekTimeMs) {
+        new PinDialogFragment(PinDialogFragment.PIN_DIALOG_TYPE_UNLOCK_PROGRAM,
+                new PinDialogFragment.ResultListener() {
+                    @Override
+                    public void done(boolean success) {
+                        if (success) {
+                            launchPlaybackActivity(recordedProgram, seekTimeMs, true);
+                        }
+                    }
+                }).show(getActivity().getFragmentManager(), PinDialogFragment.DIALOG_TAG);
+    }
+
+    private void launchPlaybackActivity(RecordedProgram mRecordedProgram, long seekTimeMs,
+            boolean pinChecked) {
+        Intent intent = new Intent(getActivity(), DvrPlaybackActivity.class);
+        intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_ID, mRecordedProgram.getId());
+        if (seekTimeMs != TvInputManager.TIME_SHIFT_INVALID_TIME) {
+            intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_SEEK_TIME, seekTimeMs);
+        }
+        intent.putExtra(Utils.EXTRA_KEY_RECORDED_PROGRAM_PIN_CHECKED, pinChecked);
+        getActivity().startActivity(intent);
     }
 
     private static class MyImageLoaderCallback extends

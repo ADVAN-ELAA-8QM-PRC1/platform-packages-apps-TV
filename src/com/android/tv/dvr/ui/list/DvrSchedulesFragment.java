@@ -18,8 +18,12 @@ package com.android.tv.dvr.ui.list;
 
 import android.os.Bundle;
 import android.support.v17.leanback.widget.ClassPresenterSelector;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 
 import com.android.tv.R;
+import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.dvr.ui.list.SchedulesHeaderRowPresenter.DateHeaderRowPresenter;
 
 /**
@@ -47,5 +51,36 @@ public class DvrSchedulesFragment extends BaseDvrSchedulesFragment {
     @Override
     public ScheduleRowAdapter onCreateRowsAdapter(ClassPresenterSelector presenterSelecor) {
         return new ScheduleRowAdapter(getContext(), presenterSelecor);
+    }
+
+    @Override
+    public void onScheduledRecordingAdded(ScheduledRecording... scheduledRecordings) {
+        super.onScheduledRecordingAdded(scheduledRecordings);
+        if (getRowsAdapter().size() > 0) {
+            hideEmptyMessage();
+        }
+    }
+
+    @Override
+    public void onScheduledRecordingRemoved(ScheduledRecording... scheduledRecordings) {
+        super.onScheduledRecordingRemoved(scheduledRecordings);
+        if (getRowsAdapter().size() == 0) {
+            showEmptyMessage(R.string.dvr_schedules_empty_state);
+        }
+    }
+
+    @Override
+    protected int getFirstItemPosition() {
+        Bundle args = getArguments();
+        ScheduledRecording recording = null;
+        if (args != null) {
+            recording = args.getParcelable(SCHEDULES_KEY_SCHEDULED_RECORDING);
+        }
+        final int selectedPostion = getRowsAdapter().indexOf(
+                getRowsAdapter().findRowByScheduledRecording(recording));
+        if (selectedPostion != -1) {
+            return selectedPostion;
+        }
+        return super.getFirstItemPosition();
     }
 }

@@ -21,15 +21,14 @@ import android.support.test.filters.SdkSuppress;
 import android.support.test.filters.SmallTest;
 import android.test.AndroidTestCase;
 import android.test.MoreAsserts;
+import android.util.LongSparseArray;
 
 import com.android.tv.data.Program;
-import com.android.tv.dvr.SeriesRecordingScheduler.ScheduledEpisode;
 import com.android.tv.testing.FakeClock;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Tests for {@link SeriesRecordingScheduler}
@@ -40,7 +39,6 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
     private static final String PROGRAM_TITLE = "MyProgram";
     private static final long CHANNEL_ID = 123;
     private static final long SERIES_RECORDING_ID1 = 1;
-    private static final long SERIES_RECORDING_ID2 = 2;
     private static final String SERIES_ID = "SERIES_ID";
     private static final String SEASON_NUMBER1 = "SEASON NUMBER1";
     private static final String SEASON_NUMBER2 = "SEASON NUMBER2";
@@ -49,8 +47,6 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
 
     private final SeriesRecording mBaseSeriesRecording = new SeriesRecording.Builder()
             .setTitle(PROGRAM_TITLE).setChannelId(CHANNEL_ID).setSeriesId(SERIES_ID).build();
-    private final SeriesRecording mSeriesRecordingSeason2 = SeriesRecording
-            .buildFrom(mBaseSeriesRecording).setStartFromSeason(2).build();
     private final Program mBaseProgram = new Program.Builder().setTitle(PROGRAM_TITLE)
             .setChannelId(CHANNEL_ID).setSeriesId(SERIES_ID).build();
 
@@ -63,40 +59,6 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
         mDataManager = new DvrDataManagerInMemoryImpl(getContext(), fakeClock);
     }
 
-    public void testEpisodeAlreadyScheduled_true() {
-        List<ScheduledEpisode> episodes = new ArrayList<>();
-        ScheduledEpisode episode = new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1,
-                EPISODE_NUMBER1);
-        episodes.add(episode);
-        assertTrue(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1, EPISODE_NUMBER1)));
-    }
-
-    public void testEpisodeAlreadyScheduled_false() {
-        List<ScheduledEpisode> episodes = new ArrayList<>();
-        ScheduledEpisode episode = new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1,
-                EPISODE_NUMBER1);
-        episodes.add(episode);
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID2, SEASON_NUMBER1, EPISODE_NUMBER1)));
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER2, EPISODE_NUMBER1)));
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1, EPISODE_NUMBER2)));
-    }
-
-    public void testEpisodeAlreadyScheduled_null() {
-        List<ScheduledEpisode> episodes = new ArrayList<>();
-        ScheduledEpisode episode = new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1,
-                EPISODE_NUMBER1);
-        episodes.add(episode);
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, null, EPISODE_NUMBER1)));
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, SEASON_NUMBER1, null)));
-        assertFalse(SeriesRecordingScheduler.isEpisodeScheduled(episodes,
-                new ScheduledEpisode(SERIES_RECORDING_ID1, null, null)));
-    }
     public void testPickOneProgramPerEpisode_onePerEpisode() {
         SeriesRecording seriesRecording = SeriesRecording.buildFrom(mBaseSeriesRecording)
                 .setId(SERIES_RECORDING_ID1).build();
@@ -108,7 +70,7 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
         Program program2 = new Program.Builder(mBaseProgram).setSeasonNumber(SEASON_NUMBER2)
                 .setEpisodeNumber(EPISODE_NUMBER2).build();
         programs.add(program2);
-        Map<Long, List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
+        LongSparseArray<List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
                 mDataManager, Collections.singletonList(seriesRecording), programs);
         MoreAsserts.assertContentsInAnyOrder(result.get(SERIES_RECORDING_ID1), program1, program2);
     }
@@ -128,7 +90,7 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
         programs.add(program3);
         Program program4 = new Program.Builder(program1).setStartTimeUtcMillis(1).build();
         programs.add(program4);
-        Map<Long, List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
+        LongSparseArray<List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
                 mDataManager, Collections.singletonList(seriesRecording), programs);
         MoreAsserts.assertContentsInAnyOrder(result.get(SERIES_RECORDING_ID1), program1, program3);
     }
@@ -142,7 +104,7 @@ public class SeriesRecordingSchedulerTest extends AndroidTestCase {
         programs.add(program1);
         Program program2 = new Program.Builder(mBaseProgram).setStartTimeUtcMillis(1).build();
         programs.add(program2);
-        Map<Long, List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
+        LongSparseArray<List<Program>> result = SeriesRecordingScheduler.pickOneProgramPerEpisode(
                 mDataManager, Collections.singletonList(seriesRecording), programs);
         MoreAsserts.assertContentsInAnyOrder(result.get(SERIES_RECORDING_ID1), program1, program2);
     }

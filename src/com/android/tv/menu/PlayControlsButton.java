@@ -129,6 +129,7 @@ public class PlayControlsButton extends FrameLayout {
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
         mButton.setEnabled(enabled);
+        mButton.setFocusable(enabled);
         mIcon.setEnabled(enabled);
         mIcon.setAlpha(enabled ? ALPHA_ENABLED : ALPHA_DISABLED);
         mLabel.setEnabled(enabled);

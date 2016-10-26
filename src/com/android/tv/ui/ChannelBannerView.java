@@ -25,6 +25,7 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Bitmap;
+import android.media.tv.TvContentRating;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.net.Uri;
@@ -57,6 +58,7 @@ import com.android.tv.data.Program;
 import com.android.tv.data.StreamInfo;
 import com.android.tv.dvr.DvrManager;
 import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.parental.ContentRatingsManager;
 import com.android.tv.util.ImageCache;
 import com.android.tv.util.ImageLoader;
 import com.android.tv.util.ImageLoader.ImageLoaderCallback;
@@ -92,6 +94,8 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
      */
     public static final int LOCK_CHANNEL_INFO = 2;
 
+    private static final int DISPLAYED_CONTENT_RATINGS_COUNT = 3;
+
     private static final String EMPTY_STRING = "";
 
     private static Program sNoProgram;
@@ -114,6 +118,7 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
     private TextView mAspectRatioTextView;
     private TextView mResolutionTextView;
     private TextView mAudioChannelTextView;
+    private TextView[] mContentRatingsTextViews = new TextView[DISPLAYED_CONTENT_RATINGS_COUNT];
     private TextView mProgramDescriptionTextView;
     private String mProgramDescriptionText;
     private View mAnchorView;
@@ -121,6 +126,8 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
     private Program mLastUpdatedProgram;
     private final Handler mHandler = new Handler();
     private final DvrManager mDvrManager;
+    private ContentRatingsManager mContentRatingsManager;
+    private TvContentRating mBlockingContentRating;
 
     private int mLockType;
 
@@ -233,6 +240,8 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
         } else {
             mDvrManager = null;
         }
+        mContentRatingsManager = TvApplication.getSingletons(getContext())
+                .getTvInputManagerHelper().getContentRatingsManager();
 
         if (sNoProgram == null) {
             sNoProgram = new Program.Builder()
@@ -284,6 +293,9 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
         mAspectRatioTextView = (TextView) findViewById(R.id.aspect_ratio);
         mResolutionTextView = (TextView) findViewById(R.id.resolution);
         mAudioChannelTextView = (TextView) findViewById(R.id.audio_channel);
+        mContentRatingsTextViews[0] = (TextView) findViewById(R.id.content_ratings_0);
+        mContentRatingsTextViews[1] = (TextView) findViewById(R.id.content_ratings_1);
+        mContentRatingsTextViews[2] = (TextView) findViewById(R.id.content_ratings_2);
         mProgramDescriptionTextView = (TextView) findViewById(R.id.program_description);
         mAnchorView = findViewById(R.id.anchor);
 
@@ -349,6 +361,15 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
     }
 
     /**
+     * Sets the content rating that blocks the current watched channel for displaying it in the
+     * channel banner.
+     */
+    public void setBlockingContentRating(TvContentRating rating) {
+        mBlockingContentRating = rating;
+        updateProgramRatings(mMainActivity.getCurrentProgram());
+    }
+
+    /**
      * Update channel banner view.
      *
      * @param info A StreamInfo that includes stream information.
@@ -357,8 +378,11 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
     public void updateViews(StreamInfo info) {
         resetAnimationEffects();
         Channel channel = mMainActivity.getCurrentChannel();
-        if (!Objects.equals(mCurrentChannel, channel) && isShown()) {
-            scheduleHide();
+        if (!Objects.equals(mCurrentChannel, channel)) {
+            mBlockingContentRating = null;
+            if (isShown()) {
+                scheduleHide();
+            }
         }
         mCurrentChannel = channel;
         mChannelView.setVisibility(VISIBLE);
@@ -390,6 +414,9 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
             mAspectRatioTextView.setVisibility(View.GONE);
             mResolutionTextView.setVisibility(View.GONE);
             mAudioChannelTextView.setVisibility(View.GONE);
+            for (int i = 0; i < DISPLAYED_CONTENT_RATINGS_COUNT; i++) {
+                mContentRatingsTextViews[i].setVisibility(View.GONE);
+            }
         }
     }
 
@@ -545,6 +572,7 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
         }
         updateProgramTimeInfo(program);
         updateRecordingStatus(program);
+        updateProgramRatings(program);
 
         // When the program is changed, but the previous resize animation has not ended yet,
         // cancel the animation.
@@ -624,6 +652,28 @@ public class ChannelBannerView extends FrameLayout implements TvTransitionManage
         updateTopMargin(mAnchorView, oneline
                 ? R.dimen.channel_banner_anchor_one_line_y
                 : R.dimen.channel_banner_anchor_two_line_y);
+    }
+
+    private void updateProgramRatings(Program program) {
+        if (mBlockingContentRating != null) {
+            mContentRatingsTextViews[0].setText(
+                    mContentRatingsManager.getDisplayNameForRating(mBlockingContentRating));
+            mContentRatingsTextViews[0].setVisibility(View.VISIBLE);
+            for (int i = 1; i < DISPLAYED_CONTENT_RATINGS_COUNT; i++) {
+                mContentRatingsTextViews[i].setVisibility(View.GONE);
+            }
+            return;
+        }
+        TvContentRating[] ratings = (program == null) ? null : program.getContentRatings();
+        for (int i = 0; i < DISPLAYED_CONTENT_RATINGS_COUNT; i++) {
+            if (ratings == null || ratings.length <= i) {
+                mContentRatingsTextViews[i].setVisibility(View.GONE);
+            } else {
+                mContentRatingsTextViews[i].setText(
+                        mContentRatingsManager.getDisplayNameForRating(ratings[i]));
+                mContentRatingsTextViews[i].setVisibility(View.VISIBLE);
+            }
+        }
     }
 
     private void updateProgramTimeInfo(Program program) {

@@ -155,9 +155,9 @@
     <string name="tvview_msg_audio_only" msgid="1356866203687173329">"केवल ऑडियो"</string>
     <string name="tvview_msg_weak_signal" msgid="1095050812622908976">"कमज़ोर सिग्नल"</string>
     <string name="tvview_msg_no_internet_connection" msgid="7655994401188888231">"कोई इंटरनेट कनेक्शन नहीं"</string>
-    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="7667615331469565106">
-      <item quantity="one">इस चैनल को <xliff:g id="END_TIME_1">%1$s</xliff:g> तक चलाया नहीं जा सकता है क्योंकि सभी ट्यूनर का उपयोग अन्य कार्यक्रमों को रिकॉर्ड करने के लिए किया जा रहा है. \n\nरिकॉर्डिंग शेड्यूल एडजस्ट करने के लिए दायां दबाएं.</item>
-      <item quantity="other">इस चैनल को <xliff:g id="END_TIME_1">%1$s</xliff:g> तक चलाया नहीं जा सकता है क्योंकि सभी ट्यूनर का उपयोग अन्य कार्यक्रमों को रिकॉर्ड करने के लिए किया जा रहा है. \n\nरिकॉर्डिंग शेड्यूल एडजस्ट करने के लिए दायां दबाएं.</item>
+    <plurals name="tvview_msg_input_no_resource" formatted="false" msgid="8581894855153658823">
+      <item quantity="one">यह चैनल <xliff:g id="END_TIME_1">%1$s</xliff:g> तक नहीं चलाया जा सकता क्योंकि अन्य चैनल रिकॉर्ड हो रहे हैं. \n\nरिकॉर्डिंग शेड्यूल समायोजित करने के लिए दाएं दबाएं.</item>
+      <item quantity="other">यह चैनल <xliff:g id="END_TIME_1">%1$s</xliff:g> तक नहीं चलाया जा सकता क्योंकि अन्य चैनल रिकॉर्ड हो रहे हैं. \n\nरिकॉर्डिंग शेड्यूल समायोजित करने के लिए दाएं दबाएं.</item>
     </plurals>
     <string name="channel_banner_no_title" msgid="8660301979190693176">"कोई शीर्षक नहीं"</string>
     <string name="channel_banner_locked_channel_title" msgid="2006564967318945980">"चैनल अवरोधित"</string>
@@ -192,6 +192,7 @@
     <string name="msg_read_tv_listing_permission_denied" msgid="8882813301235518909">"लाइव चैनल को टीवी सूची पढ़ने के लिए अनुमति की आवश्यकता होती है."</string>
     <string name="setup_sources_text" msgid="4988039637873759839">"अपने स्रोत सेट करें"</string>
     <string name="setup_sources_description" msgid="5695518946225445202">"लाइव चैनल परंपरागत टीवी चैनल के अनुभव के साथ ऐप्स के द्वारा प्रदान किए जाने वाले स्ट्रीमिंग चैनल अनुभव को संयोजित करते हैं. \n\nपहले से इंस्टॉल किए गए चैनल स्रोतों को सेट करके प्रारंभ करें. या लाइव चैनल उपलब्ध कराने वाले अधिक ऐप्स के लिए Google Play स्टोर ब्राउज़ करें."</string>
+    <string name="channels_item_dvr" msgid="8911915252648532469">"रिकॉर्डिंग और शेड्यूूल"</string>
     <string name="recording_start_dialog_10_min_duration" msgid="5739636508245795292">"10 मिनट"</string>
     <string name="recording_start_dialog_30_min_duration" msgid="4691127772622189977">"30 मिनट"</string>
     <string name="recording_start_dialog_1_hour_duration" msgid="7159533207022355641">"1 घंटा"</string>
@@ -200,6 +201,8 @@
     <string name="dvr_main_scheduled" msgid="7837260963086408492">"शेड्यूल की गई"</string>
     <string name="dvr_main_series" msgid="8278256687595691676">"श्रृंखला"</string>
     <string name="dvr_main_others" msgid="2970835573614038153">"अन्य"</string>
+    <string name="dvr_msg_cannot_record_channel" msgid="6836291367918532447">"चैनल रिकॉर्ड नहीं किया जा सकता."</string>
+    <string name="dvr_msg_cannot_record_program" msgid="4184046342810946090">"कार्यक्रम रिकॉर्ड नहीं किया जा सकता."</string>
     <string name="dvr_msg_program_scheduled" msgid="3800847542300367572">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> को रिकॉर्ड करने के लिए शेड्यूल किया गया है"</string>
     <string name="dvr_msg_current_program_scheduled" msgid="2505247201782991463">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> की अभी से <xliff:g id="ENDTIME">%2$s</xliff:g> तक की रिकॉर्डिंग"</string>
     <string name="dvr_full_schedule_card_view_title" msgid="7198521806965950089">"पूर्ण शेड्यूल"</string>
@@ -227,9 +230,11 @@
     <string name="dvr_detail_play_from_beginning" msgid="8475543568260411836">"शुरू से चलाएं"</string>
     <string name="dvr_detail_resume_play" msgid="875591300274416373">"चलाना फिर शुरू करें"</string>
     <string name="dvr_detail_delete" msgid="4535881013528321898">"हटाएं"</string>
+    <string name="dvr_detail_series_delete" msgid="4831926831670312674">"रिकॉर्डिंग हटाएं"</string>
     <string name="dvr_detail_series_resume" msgid="6935136228671386246">"फिर शुरू करें"</string>
     <string name="dvr_detail_series_season_title" msgid="5474850936497854790">"सीज़न <xliff:g id="SEASON_NUMBER">%1$s</xliff:g>"</string>
     <string name="dvr_detail_view_schedule" msgid="7137536927421904426">"शेड्यूल देखें"</string>
+    <string name="dvr_detail_read_more" msgid="2588920758094498544">"अधिक पढ़ें"</string>
     <string name="dvr_series_deletion_title" msgid="7672649492494507574">"रिकॉर्डिंग हटाएं"</string>
     <string name="dvr_series_deletion_description" msgid="994839237906552969">"वे एपिसोड चुनें जिन्हें आप हटाना चाहते हैं. हटाए जाने के बाद वे वापस नहीं मिल सकते हैं."</string>
     <string name="dvr_series_deletion_no_recordings" msgid="481210819034514">"हटाने के लिए कोई रिकॉर्डिंग नहीं है."</string>
@@ -246,17 +251,16 @@
     <string name="dvr_series_settings_priority" msgid="5836437092774185710">"प्राथमिकता"</string>
     <string name="dvr_series_settings_priority_highest" msgid="1072006447796648382">"उच्चतम"</string>
     <string name="dvr_series_settings_priority_lowest" msgid="6003996497908810225">"निम्नतम"</string>
+    <string name="dvr_series_settings_priority_rank" msgid="667778382820956116">"संख्या <xliff:g id="RANK">%1$d</xliff:g>"</string>
     <string name="dvr_series_settings_channels" msgid="3164900110165729909">"चैनल"</string>
     <string name="dvr_series_settings_channels_all" msgid="656434955168572976">"कोई भी"</string>
     <string name="dvr_priority_title" msgid="1537886929061487213">"प्राथमिकता चुनें"</string>
-    <string name="dvr_priority_description" msgid="3653317573461947180">"एक ही समय में कार्यक्रमों को रिकॉर्ड करने के लिए पर्याप्त ट्यूनर नहीं होने पर, केवल उच्च प्राथमिकता वाले कार्यक्रम रिकॉर्ड किए जाएंगे."</string>
+    <string name="dvr_priority_description" msgid="8362040921417154645">"जब एक ही समय पर कई सारे कार्यक्रम रिकॉर्ड करने हों, तो केवल उच्च प्राथमिकता वाले कार्यक्रम रिकॉर्ड किए जाएंगे."</string>
     <string name="dvr_priority_button_action_save" msgid="4773524273649733008">"सहेजें"</string>
     <string name="dvr_priority_action_one_time_recording" msgid="8174297042282719478">"एक बार की रिकॉर्डिंग को उच्च प्राथमिकता दी जाती है"</string>
     <string name="dvr_action_cancel" msgid="8094060199570272625">"रद्द करें"</string>
-    <!-- no translation found for dvr_action_error_cancel (6822474458738023531) -->
-    <skip />
-    <!-- no translation found for dvr_action_error_forget_storage (5869994565663655638) -->
-    <skip />
+    <string name="dvr_action_error_cancel" msgid="6822474458738023531">"रद्द करें"</string>
+    <string name="dvr_action_error_forget_storage" msgid="5869994565663655638">"भूल जाएं"</string>
     <string name="dvr_action_stop" msgid="1378723485295471381">"रोकें"</string>
     <string name="dvr_action_view_schedules" msgid="7442990695392774263">"रिकॉर्डिंग शेड्यूल देखें"</string>
     <string name="dvr_action_record_episode" msgid="8596182676610326327">"यह एक ही कार्यक्रम"</string>
@@ -270,17 +274,21 @@
     <string name="dvr_epg_program_recording_scheduled" msgid="1367741844291055016">"रिकॉर्डिंग शेड्यूल की गई"</string>
     <string name="dvr_epg_program_recording_conflict" msgid="4827911748865195373">"रिकॉर्डिंग संबंधी विरोध"</string>
     <string name="dvr_epg_program_recording_in_progress" msgid="2158340443975313745">"रिकॉर्ड हो रहा है"</string>
+    <string name="dvr_epg_program_recording_failed" msgid="5589124519442328896">"रिकॉर्डिंग विफल रही"</string>
     <string name="dvr_schedule_progress_message_reading_programs" msgid="6502513156469172313">"रिकॉर्डिंग शेड्यूल बनाने के लिए कार्यक्रम पढ़े जा रहे हैं"</string>
-    <!-- no translation found for dvr_error_missing_storage_title (691914341845362669) -->
+    <string name="dvr_series_schedules_progress_message_reading_programs" msgid="7221275889560136115">"प्रोग्राम पढ़े जा रहे हैं"</string>
+    <!-- no translation found for dvr_series_schedules_progress_message_updating_programs (6670286486601662465) -->
     <skip />
-    <!-- no translation found for dvr_error_missing_storage_description (1036680750969954236) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_title (4996547357826788002) -->
-    <skip />
-    <!-- no translation found for dvr_error_forget_storage_description (3973761741009546142) -->
-    <skip />
+    <string name="dvr_error_small_sized_storage_title" msgid="5020225460011469011">"DVR को अधिक जगह की आवश्यकता है"</string>
+    <string name="dvr_error_small_sized_storage_description" msgid="8909789097974895119">"आप DVR से प्रोग्राम रिकॉर्ड कर पाएंगे. हालांकि इस समय आपके डिवाइस पर DVR के काम करने के लिए पर्याप्त जगह नहीं है. कृपया एक बाहरी डिवाइस कनेक्ट करें जिसमें <xliff:g id="STORAGE_SIZE">%1$s</xliff:g> GB या उससे अधिक जगह हो और उसे डिवाइस जगह के रूप में फ़ॉर्मेट करने के चरणों का अनुसरण करें."</string>
+    <string name="dvr_error_missing_storage_title" msgid="691914341845362669">"जगह मिल नहीं रही है"</string>
+    <string name="dvr_error_missing_storage_description" msgid="1036680750969954236">"DVR द्वारा उपयोग की गई कुछ जगह मिल नहीं रही है. कृपया DVR को दोबारा सक्षम करने से पहले अपनी उपयोग की हुई बाहरी डिस्क कनेक्ट करें. वैकल्पिक रूप से, यदि जगह अब उपलब्ध नहीं है तो आप उसे भूल जाना चुन सकते हैं."</string>
+    <string name="dvr_error_forget_storage_title" msgid="4996547357826788002">"जगह को भूल जाएं?"</string>
+    <string name="dvr_error_forget_storage_description" msgid="3973761741009546142">"आपकी रिकॉर्ड की हुई सभी सामग्री और शेड्यूल खो जाएंगे."</string>
     <string name="dvr_stop_recording_dialog_title" msgid="2587018956502704278">"रिकॉर्डिंग बंद करें?"</string>
-    <string name="dvr_stop_recording_dialog_description" msgid="8059817161905528708">"रिकॉर्ड किया गया भाग DVR लाइब्रेरी में सहेजा जाएगा."</string>
+    <string name="dvr_stop_recording_dialog_description" msgid="4637830189399967761">"रिकॉर्ड की गई सामग्री सहेज ली जाएगी."</string>
+    <!-- no translation found for dvr_stop_recording_dialog_description_on_conflict (7876857267536083760) -->
+    <skip />
     <string name="dvr_program_conflict_dialog_title" msgid="109323740107060379">"रिकॉर्डिंग शेड्यूल की गई लेकिन विरोध मौजूद हैं"</string>
     <string name="dvr_channel_conflict_dialog_title" msgid="7461033430572027786">"रिकॉर्डिंग शुरू हो गई है लेकिन उसमें विरोध मौजूद हैं"</string>
     <string name="dvr_program_conflict_dialog_description_prefix" msgid="5520062013211648196">"<xliff:g id="PROGRAMNAME">%1$s</xliff:g> रिकॉर्ड किया जाएगा."</string>
@@ -298,6 +306,14 @@
     <string name="dvr_already_scheduled_dialog_description" msgid="8170126125996414810">"इसी कार्यक्रम को <xliff:g id="PROGRAMSTARTTIME">%1$s</xliff:g> बजे रिकॉर्ड करने के लिए पहले ही शेड्यूल किया जा चुका है."</string>
     <string name="dvr_already_recorded_dialog_title" msgid="2760294707162057216">"पहले ही रिकॉर्ड हो चुका है"</string>
     <string name="dvr_already_recorded_dialog_description" msgid="8966051583682746434">"यह कार्यक्रम पहले ही रिकॉर्ड हो चुका है. वह DVR लाइब्रेरी में उपलब्ध है."</string>
+    <!-- no translation found for dvr_series_recording_dialog_title (3521956660855853797) -->
+    <skip />
+    <!-- no translation found for dvr_series_recording_scheduled_no_conflict (2796926724821316879) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_this_series_conflict (2800805130979023066) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_one_conflict (3632394665556633158) -->
+    <!-- no translation found for dvr_series_recording_scheduled_this_and_other_series_conflict (2331412040101938479) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_one_conflict (5213169239215104024) -->
+    <!-- no translation found for dvr_series_recording_scheduled_only_other_series_conflict (5159645486201045330) -->
     <string name="dvr_program_not_found" msgid="3282879532038010202">"रिकॉर्ड किया गया प्रोग्राम नहीं मिला."</string>
     <string name="dvr_playback_related_recordings" msgid="6978658039329924961">"संबंधित रिकॉर्डिंग"</string>
     <string name="dvr_msg_no_program_description" msgid="2521723281247322645">"(कोई कार्यक्रम वर्णन नहीं)"</string>
@@ -310,15 +326,21 @@
     <string name="dvr_schedules_tuner_conflict_will_be_partially_recorded" msgid="5280490298546908729">"ट्यूनर संबंधी विरोधों के कारण आंशिक रूप से रिकॉर्ड होगा."</string>
     <string name="dvr_schedules_tuner_conflict_will_not_be_recorded_info" msgid="5065400564003201095">"ट्यूनर संबंधी विरोधों के कारण रिकॉर्ड नहीं किया जाएगा."</string>
     <string name="dvr_schedules_empty_state" msgid="1291529283469462741">"अभी कोई भी रिकॉर्डिंग शेड्यूल नहीं की गई है.\nआप कार्यक्रम मार्गदर्शिका से रिकॉर्डिंग शेड्यूल कर सकते हैं."</string>
-    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="5687216771746946005">
-      <item quantity="one">अगले %1$d दिनों का रिकॉर्डिंग शेड्यूल</item>
-      <item quantity="other">अगले %1$d दिनों का रिकॉर्डिंग शेड्यूल</item>
+    <plurals name="dvr_series_schedules_header_description" formatted="false" msgid="9077188267856194114">
+      <item quantity="one">%1$d रिकॉर्डिंग विरोध</item>
+      <item quantity="other">%1$d रिकॉर्डिंग विरोध</item>
     </plurals>
-    <string name="dvr_series_schedules_settings" msgid="4069530935369561001">"सेटिंग"</string>
-    <string name="dvr_series_schedules_dialog_back" msgid="1594678171444843646">"वापस"</string>
-    <string name="dvr_series_schedules_undo" msgid="7445942340901896865">"पूर्ववत करें"</string>
+    <string name="dvr_series_schedules_settings" msgid="4868501926847903985">"श्रृंखला की सेटिंग"</string>
+    <string name="dvr_series_schedules_start" msgid="8458768834047133835">"श्रृंखला रिकॉर्डिंग शुरू करें"</string>
+    <string name="dvr_series_schedules_stop" msgid="3427479298317584961">"श्रृंखला रिकॉर्डिंग रोकें"</string>
+    <string name="dvr_series_schedules_stop_dialog_title" msgid="4975886236535334420">"श्रृंखला की रिकॉर्डिंग रोकें?"</string>
+    <string name="dvr_series_schedules_stop_dialog_description" msgid="7547266283366940085">"रिकॉर्ड किए गए एपिसोड DVR लाइब्रेरी में उपलब्ध रहेंगे."</string>
+    <string name="dvr_series_schedules_stop_dialog_action_stop" msgid="2351839914865142478">"रोकें"</string>
     <string name="dvr_series_schedules_empty_state" msgid="3407962945399698707">"कोई भी एपिसोड उपलब्ध नहीं है.\nएपिसोड उपलब्ध होने पर उन्हें रिकॉर्ड कर लिया जाएगा."</string>
-    <!-- no translation found for dvr_schedules_recording_duration (3701771573063918552) -->
+    <plurals name="dvr_schedules_recording_duration" formatted="false" msgid="3701771573063918552">
+      <item quantity="one">(%1$d मिनट)</item>
+      <item quantity="other">(%1$d मिनट)</item>
+    </plurals>
     <string name="dvr_date_today" msgid="7691050705354303471">"आज"</string>
     <string name="dvr_date_tomorrow" msgid="4136735681186981844">"कल"</string>
     <string name="dvr_date_yesterday" msgid="2127672919053118239">"कल"</string>

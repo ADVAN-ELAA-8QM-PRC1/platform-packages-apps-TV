@@ -17,7 +17,6 @@
 package com.android.tv.tuner.source;
 
 import android.content.Context;
-import android.media.MediaDataSource;
 
 import com.android.tv.tuner.data.Channel;
 import com.android.tv.tuner.data.TunerChannel;
@@ -27,15 +26,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages {@link TsMediaDataSource} for playback and recording.
+ * Manages {@link DataSource} for playback and recording.
  * The class hides handling of {@link TunerHal} and {@link TsStreamer} from other classes.
- * One TsMediaDataSourceManager should be created for per session.
+ * One TsDataSourceManager should be created for per session.
  */
-public class TsMediaDataSourceManager {
-    private static String TAG = "TsMediaDataSourceManager";
+public class TsDataSourceManager {
+    private static String TAG = "TsDataSourceManager";
 
     private static final Object sLock = new Object();
-    private static final Map<TsMediaDataSource, TsStreamer> sTsStreamers =
+    private static final Map<TsDataSource, TsStreamer> sTsStreamers =
             new ConcurrentHashMap<>();
 
     private static int sSequenceId;
@@ -48,33 +47,33 @@ public class TsMediaDataSourceManager {
     private boolean mKeepTuneStatus;
 
     /**
-     * Creates TsMediaDataSourceManager to create and release {@link MediaDataSource} which will be
+     * Creates TsDataSourceManager to create and release {@link DataSource} which will be
      * used for playing and recording.
      * @param isRecording {@code true} when for recording, {@code false} otherwise
-     * @return {@link TsMediaDataSourceManager}
+     * @return {@link TsDataSourceManager}
      */
-    public static TsMediaDataSourceManager createSourceManager(boolean isRecording) {
+    public static TsDataSourceManager createSourceManager(boolean isRecording) {
         int id;
         synchronized (sLock) {
             id = ++sSequenceId;
         }
-        return new TsMediaDataSourceManager(id, isRecording);
+        return new TsDataSourceManager(id, isRecording);
     }
 
-    private TsMediaDataSourceManager(int id, boolean isRecording) {
+    private TsDataSourceManager(int id, boolean isRecording) {
         mId = id;
         mIsRecording = isRecording;
         mKeepTuneStatus = true;
     }
 
     /**
-     * Creates or retrieves {@link TsMediaDataSource} for playing or recording
+     * Creates or retrieves {@link TsDataSource} for playing or recording
      * @param context a {@link Context} instance
      * @param channel to play or record
      * @param eventListener for program information which will be scanned from MPEG2-TS stream
-     * @return {@link TsMediaDataSource} which will provide the specified channel stream
+     * @return {@link TsDataSource} which will provide the specified channel stream
      */
-    public TsMediaDataSource createDataSource(Context context, TunerChannel channel,
+    public TsDataSource createDataSource(Context context, TunerChannel channel,
             EventDetector.EventListener eventListener) {
         if (channel.getType() == Channel.TYPE_FILE) {
             // MPEG2 TS captured stream file recording is not supported.
@@ -83,7 +82,7 @@ public class TsMediaDataSourceManager {
             }
             FileTsStreamer streamer = new FileTsStreamer(eventListener);
             if (streamer.startStream(channel)) {
-                TsMediaDataSource source = streamer.createMediaDataSource();
+                TsDataSource source = streamer.createDataSource();
                 sTsStreamers.put(source, streamer);
                 return source;
             }
@@ -94,14 +93,14 @@ public class TsMediaDataSourceManager {
     }
 
     /**
-     * Releases the specified {@link MediaDataSource} and underlying {@link TunerHal}.
+     * Releases the specified {@link TsDataSource} and underlying {@link TunerHal}.
      * @param source to release
      */
-    public void releaseDataSource(TsMediaDataSource source) {
-        if (source instanceof TunerTsStreamer.TunerMediaDataSource) {
+    public void releaseDataSource(TsDataSource source) {
+        if (source instanceof TunerTsStreamer.TunerDataSource) {
             mTunerStreamerManager.releaseDataSource(
                     source, mId, !mIsRecording && mKeepTuneStatus);
-        } else if (source instanceof FileTsStreamer.FileMediaDataSource) {
+        } else if (source instanceof FileTsStreamer.FileDataSource) {
             FileTsStreamer streamer = (FileTsStreamer) sTsStreamers.get(source);
             if (streamer != null) {
                 sTsStreamers.remove(source);

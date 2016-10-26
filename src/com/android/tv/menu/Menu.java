@@ -179,7 +179,9 @@ public class Menu {
         mMenuView.onShow(reason, rowIdToSelect, mAnimationDisabledForTest ? null : new Runnable() {
             @Override
             public void run() {
-                mShowAnimator.start();
+                if (isActive()) {
+                    mShowAnimator.start();
+                }
             }
         });
         scheduleHide();
@@ -189,6 +191,9 @@ public class Menu {
      * Closes the menu.
      */
     public void hide(boolean withAnimation) {
+        if (mShowAnimator.isStarted()) {
+            mShowAnimator.cancel();
+        }
         if (!isActive()) {
             return;
         }

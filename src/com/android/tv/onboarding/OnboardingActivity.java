@@ -44,7 +44,6 @@ public class OnboardingActivity extends SetupActivity {
     private static final String KEY_INTENT_AFTER_COMPLETION = "key_intent_after_completion";
 
     private static final int PERMISSIONS_REQUEST_READ_TV_LISTINGS = 1;
-    private static final String PERMISSION_READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS";
 
     private static final int SHOW_RIPPLE_DURATION_MS = 266;
 
@@ -82,10 +81,19 @@ public class OnboardingActivity extends SetupActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (!PermissionUtils.hasAccessAllEpg(this)
-            && checkSelfPermission(PERMISSION_READ_TV_LISTINGS)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{PERMISSION_READ_TV_LISTINGS},
+        ApplicationSingletons singletons = TvApplication.getSingletons(this);
+        mInputManager = singletons.getTvInputManagerHelper();
+        if (PermissionUtils.hasAccessAllEpg(this) || PermissionUtils.hasReadTvListings(this)) {
+            mChannelDataManager = singletons.getChannelDataManager();
+            // Make the channels of the new inputs which have been setup outside Live TV
+            // browsable.
+            if (mChannelDataManager.isDbLoadFinished()) {
+                SetupUtils.getInstance(this).markNewChannelsBrowsable();
+            } else {
+                mChannelDataManager.addListener(mChannelListener);
+            }
+        } else {
+            requestPermissions(new String[] {PermissionUtils.PERMISSION_READ_TV_LISTINGS},
                     PERMISSIONS_REQUEST_READ_TV_LISTINGS);
         }
     }
@@ -101,16 +109,6 @@ public class OnboardingActivity extends SetupActivity {
     @Override
     protected Fragment onCreateInitialFragment() {
         if (PermissionUtils.hasAccessAllEpg(this) || PermissionUtils.hasReadTvListings(this)) {
-            ApplicationSingletons singletons = TvApplication.getSingletons(this);
-            mChannelDataManager = singletons.getChannelDataManager();
-            mInputManager = singletons.getTvInputManagerHelper();
-            // Make the channels of the new inputs which have been setup outside Live TV
-            // browsable.
-            if (mChannelDataManager.isDbLoadFinished()) {
-                SetupUtils.getInstance(this).markNewChannelsBrowsable();
-            } else {
-                mChannelDataManager.addListener(mChannelListener);
-            }
             return OnboardingUtils.isFirstRunWithCurrentVersion(this) ? new WelcomeFragment()
                     : new SetupSourcesFragment();
         }

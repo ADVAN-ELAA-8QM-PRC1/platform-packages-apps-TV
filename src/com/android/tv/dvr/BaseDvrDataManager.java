@@ -30,9 +30,10 @@ import com.android.tv.dvr.ScheduledRecording.RecordingState;
 import com.android.tv.util.Clock;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,35 +137,35 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
     }
 
     /**
-     * Calls {@link RecordedProgramListener#onRecordedProgramAdded(RecordedProgram)}
+     * Calls {@link RecordedProgramListener#onRecordedProgramsAdded}
      * for each listener.
      */
-    protected final void notifyRecordedProgramAdded(RecordedProgram recordedProgram) {
+    protected final void notifyRecordedProgramsAdded(RecordedProgram... recordedPrograms) {
         for (RecordedProgramListener l : mRecordedProgramListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "added " + recordedProgram);
-            l.onRecordedProgramAdded(recordedProgram);
+            if (DEBUG) Log.d(TAG, "notify " + l + " added " + Arrays.asList(recordedPrograms));
+            l.onRecordedProgramsAdded(recordedPrograms);
         }
     }
 
     /**
-     * Calls {@link RecordedProgramListener#onRecordedProgramChanged(RecordedProgram)}
+     * Calls {@link RecordedProgramListener#onRecordedProgramsChanged}
      * for each listener.
      */
-    protected final void notifyRecordedProgramChanged(RecordedProgram recordedProgram) {
+    protected final void notifyRecordedProgramsChanged(RecordedProgram... recordedPrograms) {
         for (RecordedProgramListener l : mRecordedProgramListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "changed " + recordedProgram);
-            l.onRecordedProgramChanged(recordedProgram);
+            if (DEBUG) Log.d(TAG, "notify " + l + " changed " + Arrays.asList(recordedPrograms));
+            l.onRecordedProgramsChanged(recordedPrograms);
         }
     }
 
     /**
-     * Calls {@link RecordedProgramListener#onRecordedProgramRemoved(RecordedProgram)}
+     * Calls {@link RecordedProgramListener#onRecordedProgramsRemoved}
      * for each  listener.
      */
-    protected final void notifyRecordedProgramRemoved(RecordedProgram recordedProgram) {
+    protected final void notifyRecordedProgramsRemoved(RecordedProgram... recordedPrograms) {
         for (RecordedProgramListener l : mRecordedProgramListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "removed " + recordedProgram);
-            l.onRecordedProgramRemoved(recordedProgram);
+            if (DEBUG) Log.d(TAG, "notify " + l + " removed " + Arrays.asList(recordedPrograms));
+            l.onRecordedProgramsRemoved(recordedPrograms);
         }
     }
 
@@ -174,7 +175,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
      */
     protected final void notifySeriesRecordingAdded(SeriesRecording... seriesRecordings) {
         for (SeriesRecordingListener l : mSeriesRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "added  " + seriesRecordings);
+            if (DEBUG) Log.d(TAG, "notify " + l + " added  " + Arrays.asList(seriesRecordings));
             l.onSeriesRecordingAdded(seriesRecordings);
         }
     }
@@ -185,7 +186,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
      */
     protected final void notifySeriesRecordingRemoved(SeriesRecording... seriesRecordings) {
         for (SeriesRecordingListener l : mSeriesRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "removed " + seriesRecordings);
+            if (DEBUG) Log.d(TAG, "notify " + l + " removed " + Arrays.asList(seriesRecordings));
             l.onSeriesRecordingRemoved(seriesRecordings);
         }
     }
@@ -197,7 +198,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
      */
     protected final void notifySeriesRecordingChanged(SeriesRecording... seriesRecordings) {
         for (SeriesRecordingListener l : mSeriesRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "changed " + seriesRecordings);
+            if (DEBUG) Log.d(TAG, "notify " + l + " changed " + Arrays.asList(seriesRecordings));
             l.onSeriesRecordingChanged(seriesRecordings);
         }
     }
@@ -208,7 +209,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
      */
     protected final void notifyScheduledRecordingAdded(ScheduledRecording... scheduledRecording) {
         for (ScheduledRecordingListener l : mScheduledRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "added  " + scheduledRecording);
+            if (DEBUG) Log.d(TAG, "notify " + l + " added  " + Arrays.asList(scheduledRecording));
             l.onScheduledRecordingAdded(scheduledRecording);
         }
     }
@@ -219,7 +220,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
      */
     protected final void notifyScheduledRecordingRemoved(ScheduledRecording... scheduledRecording) {
         for (ScheduledRecordingListener l : mScheduledRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "removed " + scheduledRecording);
+            if (DEBUG) Log.d(TAG, "notify " + l + " removed " + Arrays.asList(scheduledRecording));
             l.onScheduledRecordingRemoved(scheduledRecording);
         }
     }
@@ -232,7 +233,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
     protected final void notifyScheduledRecordingStatusChanged(
             ScheduledRecording... scheduledRecording) {
         for (ScheduledRecordingListener l : mScheduledRecordingListeners) {
-            if (DEBUG) Log.d(TAG, "notify " + l + "changed " + scheduledRecording);
+            if (DEBUG) Log.d(TAG, "notify " + l + " changed " + Arrays.asList(scheduledRecording));
             l.onScheduledRecordingStatusChanged(scheduledRecording);
         }
     }
@@ -259,14 +260,6 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
     }
 
     @Override
-    public List<ScheduledRecording> getAvailableAndCanceledScheduledRecordings() {
-        return filterEndTimeIsPast(getRecordingsWithState(
-                ScheduledRecording.STATE_RECORDING_IN_PROGRESS,
-                ScheduledRecording.STATE_RECORDING_NOT_STARTED,
-                ScheduledRecording.STATE_RECORDING_CANCELED));
-    }
-
-    @Override
     public List<ScheduledRecording> getStartedRecordings() {
         return filterEndTimeIsPast(getRecordingsWithState(
                 ScheduledRecording.STATE_RECORDING_IN_PROGRESS));
@@ -274,8 +267,6 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
 
     @Override
     public List<ScheduledRecording> getNonStartedScheduledRecordings() {
-        Set<Integer> states = new HashSet<>();
-        states.add(ScheduledRecording.STATE_RECORDING_NOT_STARTED);
         return filterEndTimeIsPast(getRecordingsWithState(
                 ScheduledRecording.STATE_RECORDING_NOT_STARTED));
     }
@@ -314,6 +305,9 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
     @Override
     public List<RecordedProgram> getRecordedPrograms(long seriesRecordingId) {
         SeriesRecording seriesRecording = getSeriesRecording(seriesRecordingId);
+        if (seriesRecording == null) {
+            return Collections.emptyList();
+        }
         List<RecordedProgram> result = new ArrayList<>();
         for (RecordedProgram r : getRecordedPrograms()) {
             if (seriesRecording.getSeriesId().equals(r.getSeriesId())) {
@@ -322,4 +316,7 @@ public abstract class BaseDvrDataManager implements WritableDvrDataManager {
         }
         return result;
     }
+
+    @Override
+    public void forgetStorage(String inputId) { }
 }

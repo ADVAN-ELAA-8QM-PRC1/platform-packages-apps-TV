@@ -16,10 +16,12 @@
 
 package com.android.tv.tuner.exoplayer;
 
-import android.media.MediaDataSource;
-import android.media.tv.TvContract;
+import android.net.Uri;
 import android.os.ConditionVariable;
 import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
 import android.os.SystemClock;
 
 import com.google.android.exoplayer.C;
@@ -28,6 +30,7 @@ import com.google.android.exoplayer.MediaFormatHolder;
 import com.google.android.exoplayer.SampleHolder;
 import com.google.android.exoplayer.SampleSource;
 import com.google.android.exoplayer.extractor.ExtractorSampleSource;
+import com.google.android.exoplayer.extractor.ExtractorSampleSource.EventListener;
 import com.google.android.exoplayer.upstream.Allocator;
 import com.google.android.exoplayer.upstream.DataSource;
 import com.google.android.exoplayer.upstream.DefaultAllocator;
@@ -41,6 +44,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -48,36 +52,49 @@ import java.util.concurrent.atomic.AtomicLong;
  * For demux, this class relies on {@link com.google.android.exoplayer.extractor.ts.TsExtractor}.
  */
 public class ExoPlayerSampleExtractor implements SampleExtractor {
-    private static final String TAG = "ExoPlayerSampleExtractor";
+    private static final String TAG = "ExoPlayerSampleExtracto";
 
     // Buffer segment size for memory allocator. Copied from demo implementation of ExoPlayer.
     private static final int BUFFER_SEGMENT_SIZE_IN_BYTES = 64 * 1024;
     // Buffer segment count for sample source. Copied from demo implementation of ExoPlayer.
     private static final int BUFFER_SEGMENT_COUNT = 256;
 
-    private static final AtomicLong ID_COUNTER = new AtomicLong(0);
-
-    private final ExtractorThread mExtractorThread;
-    private final BufferManager.SampleBuffer mSampleBuffer;
+    private final HandlerThread mSourceReaderThread;
     private final long mId;
-    private final List<MediaFormat> mTrackFormats = new ArrayList<>();
 
-    private final SampleSource.SampleSourceReader mSampleSourceReader;
+    private final Handler.Callback mSourceReaderWorker;
 
-    private boolean mReleased;
-    private boolean mOnCompletionCalled;
+    private BufferManager.SampleBuffer mSampleBuffer;
+    private Handler mSourceReaderHandler;
+    private volatile boolean mPrepared;
+    private AtomicBoolean mOnCompletionCalled = new AtomicBoolean();
+    private IOException mExceptionOnPrepare;
+    private List<MediaFormat> mTrackFormats;
     private HashMap<Integer, Long> mLastExtractedPositionUsMap = new HashMap<>();
     private OnCompletionListener mOnCompletionListener;
     private Handler mOnCompletionListenerHandler;
+    private IOException mError;
 
-    public ExoPlayerSampleExtractor(DataSource source, BufferManager bufferManager,
+    public ExoPlayerSampleExtractor(Uri uri, DataSource source, BufferManager bufferManager,
             PlaybackBufferListener bufferListener, boolean isRecording) {
-        mId = ID_COUNTER.incrementAndGet();
+        // It'll be used as a timeshift file chunk name's prefix.
+        mId = System.currentTimeMillis();
         Allocator allocator = new DefaultAllocator(BUFFER_SEGMENT_SIZE_IN_BYTES);
-        mSampleSourceReader = new ExtractorSampleSource(TvContract.Programs.CONTENT_URI, source,
-                allocator, BUFFER_SEGMENT_COUNT * BUFFER_SEGMENT_SIZE_IN_BYTES, null, null, 0);
 
-        mExtractorThread = new ExtractorThread();
+        EventListener eventListener = new EventListener() {
+
+            @Override
+            public void onLoadError(int sourceId, IOException e) {
+                mError = e;
+            }
+        };
+
+        mSourceReaderThread = new HandlerThread("SourceReaderThread");
+        mSourceReaderWorker = new SourceReaderWorker(new ExtractorSampleSource(uri, source,
+                allocator, BUFFER_SEGMENT_COUNT * BUFFER_SEGMENT_SIZE_IN_BYTES,
+                // Do not create a handler if we not on a looper. e.g. test.
+                Looper.myLooper() != null ? new Handler() : null,
+                eventListener, 0));
         if (isRecording) {
             mSampleBuffer = new RecordingSampleBuffer(bufferManager, bufferListener, false,
                     RecordingSampleBuffer.BUFFER_REASON_RECORDING);
@@ -97,35 +114,114 @@ public class ExoPlayerSampleExtractor implements SampleExtractor {
         mOnCompletionListenerHandler = handler;
     }
 
-    private class ExtractorThread extends Thread {
-        private static final int FETCH_SAMPLE_INTERVAL_MS = 50;
-        private volatile boolean mQuitRequested = false;
+    private class SourceReaderWorker implements Handler.Callback {
+        public static final int MSG_PREPARE = 1;
+        public static final int MSG_FETCH_SAMPLES = 2;
+        public static final int MSG_RELEASE = 3;
+        private static final int RETRY_INTERVAL_MS = 50;
+
+        private final SampleSource mSampleSource;
+        private SampleSource.SampleSourceReader mSampleSourceReader;
+        private boolean[] mTrackMetEos;
+        private boolean mMetEos = false;
         private long mCurrentPosition;
 
-        public ExtractorThread() {
-            super("ExtractorThread");
+        public SourceReaderWorker(SampleSource sampleSource) {
+            mSampleSource = sampleSource;
         }
 
         @Override
-        public void run() {
-            SampleHolder sample = new SampleHolder(SampleHolder.BUFFER_REPLACEMENT_MODE_NORMAL);
-            ConditionVariable conditionVariable = new ConditionVariable();
-            int trackCount = mSampleSourceReader.getTrackCount();
-            while (!mQuitRequested) {
-                boolean didSomething = false;
-                for (int i = 0; i < trackCount; ++i) {
-                    if(SampleSource.NOTHING_READ != fetchSample(i, sample, conditionVariable)) {
-                        didSomething = true;
+        public boolean handleMessage(Message message) {
+            switch (message.what) {
+                case MSG_PREPARE:
+                    mPrepared = prepare();
+                    if (!mPrepared && mExceptionOnPrepare == null) {
+                            mSourceReaderHandler
+                                    .sendEmptyMessageDelayed(MSG_PREPARE, RETRY_INTERVAL_MS);
+                    } else{
+                        mSourceReaderHandler.sendEmptyMessage(MSG_FETCH_SAMPLES);
                     }
+                    return true;
+                case MSG_FETCH_SAMPLES:
+                    boolean didSomething = false;
+                    SampleHolder sample = new SampleHolder(
+                            SampleHolder.BUFFER_REPLACEMENT_MODE_NORMAL);
+                    ConditionVariable conditionVariable = new ConditionVariable();
+                    int trackCount = mSampleSourceReader.getTrackCount();
+                    for (int i = 0; i < trackCount; ++i) {
+                        if (!mTrackMetEos[i] && SampleSource.NOTHING_READ
+                                != fetchSample(i, sample, conditionVariable)) {
+                            if (mMetEos) {
+                                // If mMetEos was on during fetchSample() due to an error,
+                                // fetching from other tracks is not necessary.
+                                break;
+                            }
+                            didSomething = true;
+                        }
+                    }
+                    if (!mMetEos) {
+                        if (didSomething) {
+                            mSourceReaderHandler.sendEmptyMessage(MSG_FETCH_SAMPLES);
+                        } else {
+                            mSourceReaderHandler.sendEmptyMessageDelayed(MSG_FETCH_SAMPLES,
+                                    RETRY_INTERVAL_MS);
+                        }
+                    } else {
+                        notifyCompletionIfNeeded(false);
+                    }
+                    return true;
+                case MSG_RELEASE:
+                    if (mSampleSourceReader != null) {
+                        if (mPrepared) {
+                            // ExtractorSampleSource expects all the tracks should be disabled
+                            // before releasing.
+                            int count = mSampleSourceReader.getTrackCount();
+                            for (int i = 0; i < count; ++i) {
+                                mSampleSourceReader.disable(i);
+                            }
+                        }
+                        mSampleSourceReader.release();
+                        mSampleSourceReader = null;
+                    }
+                    cleanUp();
+                    mSourceReaderHandler.removeCallbacksAndMessages(null);
+                    return true;
+            }
+            return false;
+        }
+
+        private boolean prepare() {
+            if (mSampleSourceReader == null) {
+                mSampleSourceReader = mSampleSource.register();
+            }
+            if(!mSampleSourceReader.prepare(0)) {
+                return false;
+            }
+            if (mTrackFormats == null) {
+                int trackCount = mSampleSourceReader.getTrackCount();
+                mTrackMetEos = new boolean[trackCount];
+                List<MediaFormat> trackFormats = new ArrayList<>();
+                for (int i = 0; i < trackCount; i++) {
+                    trackFormats.add(mSampleSourceReader.getFormat(i));
+                    mSampleSourceReader.enable(i, 0);
+
                 }
-                if (!didSomething) {
-                    try {
-                        Thread.sleep(FETCH_SAMPLE_INTERVAL_MS);
-                    } catch (InterruptedException e) {
-                    }
+                mTrackFormats = trackFormats;
+                List<String> ids = new ArrayList<>();
+                for (int i = 0; i < mTrackFormats.size(); i++) {
+                    ids.add(String.format(Locale.ENGLISH, "%s_%x", Long.toHexString(mId), i));
+                }
+                try {
+                    mSampleBuffer.init(ids, mTrackFormats);
+                } catch (IOException e) {
+                    // In this case, we will not schedule any further operation.
+                    // mExceptionOnPrepare will be notified to ExoPlayer, and ExoPlayer will
+                    // call release() eventually.
+                    mExceptionOnPrepare = e;
+                    return false;
                 }
             }
-            cleanUp();
+            return true;
         }
 
         private int fetchSample(int track, SampleHolder sample,
@@ -150,19 +246,23 @@ public class ExoPlayerSampleExtractor implements SampleExtractor {
                     queueSample(track, sample, conditionVariable);
                 } catch (IOException e) {
                     mLastExtractedPositionUsMap.clear();
-                    mQuitRequested = true;
+                    mMetEos = true;
                     mSampleBuffer.setEos();
                 }
             } else if (ret == SampleSource.END_OF_STREAM) {
-                mQuitRequested = true;
-                mSampleBuffer.setEos();
+                mTrackMetEos[track] = true;
+                for (int i = 0; i < mTrackMetEos.length; ++i) {
+                    if (!mTrackMetEos[i]) {
+                        break;
+                    }
+                    if (i == mTrackMetEos.length -1) {
+                        mMetEos = true;
+                        mSampleBuffer.setEos();
+                    }
+                }
             }
             // TODO: Handle SampleSource.FORMAT_READ for dynamic resolution change. b/28169263
             return ret;
-        }
-
-        public void quit() {
-            mQuitRequested = true;
         }
     }
 
@@ -179,29 +279,30 @@ public class ExoPlayerSampleExtractor implements SampleExtractor {
     }
 
     @Override
-    public boolean prepare() throws IOException {
-        synchronized (this) {
-            if(!mSampleSourceReader.prepare(0)) {
-                return false;
-            }
-            int trackCount = mSampleSourceReader.getTrackCount();
-            mTrackFormats.clear();
-            for (int i = 0; i < trackCount; i++) {
-                mTrackFormats.add(mSampleSourceReader.getFormat(i));
-                mSampleSourceReader.enable(i, 0);
-            }
-            List<String> ids = new ArrayList<>();
-            for (int i = 0; i < trackCount; i++) {
-                ids.add(String.format(Locale.ENGLISH, "%s_%x", Long.toHexString(mId), i));
-            }
-            mSampleBuffer.init(ids, mTrackFormats);
+    public void maybeThrowError() throws IOException {
+        if (mError != null) {
+            IOException e = mError;
+            mError = null;
+            throw e;
         }
-        mExtractorThread.start();
-        return true;
     }
 
     @Override
-    public synchronized List<MediaFormat> getTrackFormats() {
+    public boolean prepare() throws IOException {
+        if (!mSourceReaderThread.isAlive()) {
+            mSourceReaderThread.start();
+            mSourceReaderHandler = new Handler(mSourceReaderThread.getLooper(),
+                    mSourceReaderWorker);
+            mSourceReaderHandler.sendEmptyMessage(SourceReaderWorker.MSG_PREPARE);
+        }
+        if (mExceptionOnPrepare != null) {
+            throw mExceptionOnPrepare;
+        }
+        return mPrepared;
+    }
+
+    @Override
+    public List<MediaFormat> getTrackFormats() {
         return mTrackFormats;
     }
 
@@ -243,27 +344,45 @@ public class ExoPlayerSampleExtractor implements SampleExtractor {
 
     @Override
     public void release() {
-        synchronized (this) {
-            mReleased = true;
-        }
-        if (mExtractorThread.isAlive()) {
-            mExtractorThread.quit();
+        if (mSourceReaderThread.isAlive()) {
+            mSourceReaderHandler.removeCallbacksAndMessages(null);
+            mSourceReaderHandler.sendEmptyMessage(SourceReaderWorker.MSG_RELEASE);
+            mSourceReaderThread.quitSafely();
+            // Return early in this case so that session worker can start working on the next
+            // request as early as it can. The clean up will be done in the reader thread while
+            // handling MSG_RELEASE.
         } else {
             cleanUp();
         }
     }
 
-    private void onCompletion(final boolean result, long lastExtractedPositionUs) {
-        final OnCompletionListener listener = mOnCompletionListener;
-        if (mOnCompletionListenerHandler != null && mOnCompletionListener != null) {
-            mOnCompletionListenerHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    listener.onCompletion(result, lastExtractedPositionUs);
-                }
-            });
+    private void cleanUp() {
+        boolean result = true;
+        try {
+            if (mSampleBuffer != null) {
+                mSampleBuffer.release();
+                mSampleBuffer = null;
+            }
+        } catch (IOException e) {
+            result = false;
         }
-        mOnCompletionCalled = true;
+        notifyCompletionIfNeeded(result);
+        setOnCompletionListener(null, null);
+    }
+
+    private void notifyCompletionIfNeeded(final boolean result) {
+        if (!mOnCompletionCalled.getAndSet(true)) {
+            final OnCompletionListener listener = mOnCompletionListener;
+            final long lastExtractedPositionUs = getLastExtractedPositionUs();
+            if (mOnCompletionListenerHandler != null && mOnCompletionListener != null) {
+                mOnCompletionListenerHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        listener.onCompletion(result, lastExtractedPositionUs);
+                    }
+                });
+            }
+        }
     }
 
     private long getLastExtractedPositionUs() {
@@ -275,24 +394,5 @@ public class ExoPlayerSampleExtractor implements SampleExtractor {
             lastExtractedPositionUs = C.UNKNOWN_TIME_US;
         }
         return lastExtractedPositionUs;
-    }
-
-    private synchronized void cleanUp() {
-        if (!mReleased) {
-            if (!mOnCompletionCalled) {
-                onCompletion(false, getLastExtractedPositionUs());
-            }
-            return;
-        }
-        boolean result = true;
-        try {
-            mSampleBuffer.release();
-        } catch (IOException e) {
-            result = false;
-        }
-        if (!mOnCompletionCalled) {
-            onCompletion(result, getLastExtractedPositionUs());
-        }
-        setOnCompletionListener(null, null);
     }
 }

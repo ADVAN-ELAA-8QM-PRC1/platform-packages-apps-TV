@@ -57,9 +57,7 @@ public abstract class SetupGuidedStepFragment extends GuidedStepFragment {
                     R.dimen.setup_done_button_container_width);
             // Guided actions list
             View list = view.findViewById(R.id.guidedactions_list);
-            View list2 = view.findViewById(R.id.guidedactions_list2);
-            MarginLayoutParams marginLayoutParams = (MarginLayoutParams) view.findViewById(
-                    R.id.guidedactions_list).getLayoutParams();
+            MarginLayoutParams marginLayoutParams = (MarginLayoutParams) list.getLayoutParams();
             // Use content view to check layout direction while view is being created.
             if (getResources().getConfiguration().getLayoutDirection()
                     == View.LAYOUT_DIRECTION_LTR) {

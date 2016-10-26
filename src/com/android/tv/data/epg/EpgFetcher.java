@@ -30,7 +30,6 @@ import android.media.tv.TvContract;
 import android.media.tv.TvContract.Programs;
 import android.media.tv.TvContract.Programs.Genres;
 import android.media.tv.TvInputInfo;
-import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
@@ -45,13 +44,11 @@ import android.util.Log;
 
 import com.android.tv.TvApplication;
 import com.android.tv.common.WeakHandler;
-import com.android.tv.common.feature.CommonFeatures;
 import com.android.tv.data.Channel;
 import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.InternalDataUtils;
 import com.android.tv.data.Lineup;
 import com.android.tv.data.Program;
-import com.android.tv.dvr.SeriesRecordingScheduler;
 import com.android.tv.util.LocationUtils;
 import com.android.tv.util.RecurringRunner;
 import com.android.tv.util.Utils;
@@ -69,13 +66,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class EpgFetcher {
     private static final String TAG = "EpgFetcher";
-    private static final boolean DEBUG = true;  // STOPSHIP(DVR)
+    private static final boolean DEBUG = false;
 
     private static final int MSG_FETCH_EPG = 1;
 
     private static final long EPG_PREFETCH_RECURRING_PERIOD_MS = TimeUnit.HOURS.toMillis(4);
     private static final long EPG_READER_INIT_WAIT_MS = TimeUnit.MINUTES.toMillis(1);
-    private static final long LOCATION_INIT_WAIT_MS = TimeUnit.MINUTES.toMillis(1);
+    private static final long LOCATION_INIT_WAIT_MS = TimeUnit.SECONDS.toMillis(10);
     private static final long LOCATION_ERROR_WAIT_MS = TimeUnit.HOURS.toMillis(1);
     private static final long PROGRAM_QUERY_DURATION = TimeUnit.DAYS.toMillis(30);
 
@@ -184,17 +181,16 @@ public class EpgFetcher {
 
         try {
             Address address = LocationUtils.getCurrentAddress(mContext);
-            if (address == null) {
-                if (DEBUG) Log.d(TAG, "Failed to get the current address.");
-                return false;
-            }
-            if (!TextUtils.equals(address.getCountryCode(), SUPPORTED_COUNTRY_CODE)) {
+            if (address != null
+                    && !TextUtils.equals(address.getCountryCode(), SUPPORTED_COUNTRY_CODE)) {
                 if (DEBUG) Log.d(TAG, "Country not supported: " + address.getCountryCode());
                 return false;
             }
-        } catch (IOException | SecurityException e) {
-            Log.w(TAG, "Exception when getting the current location", e);
+        } catch (SecurityException e) {
+            Log.w(TAG, "No permission to get the current location", e);
             return false;
+        } catch (IOException e) {
+            Log.w(TAG, "IO Exception when getting the current location", e);
         }
         return true;
     }
@@ -319,15 +315,6 @@ public class EpgFetcher {
         final boolean epgUpdated = updated;
         setLastUpdatedEpgTimestamp(epgTimestamp);
         mHandler.removeMessages(MSG_FETCH_EPG);
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                mRecurringRunner.resetNextRunTime();
-                if (epgUpdated && CommonFeatures.DVR.isEnabled(mContext)) {
-                    SeriesRecordingScheduler.getInstance(mContext).updateSchedules();
-                }
-            }
-        });
         if (DEBUG) Log.d(TAG, "Fetching EPG is finished.");
     }
 

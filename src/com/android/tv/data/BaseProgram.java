@@ -129,6 +129,11 @@ public abstract class BaseProgram {
     abstract public long getDurationMillis();
 
     /**
+     * Returns the series ID.
+     */
+    abstract public String getSeriesId();
+
+    /**
      * Returns the season number.
      */
     abstract public String getSeasonNumber();
@@ -147,6 +152,11 @@ public abstract class BaseProgram {
      * Returns URI of the program's thumbnail.
      */
     abstract public String getThumbnailUri();
+
+    /**
+     * Returns the array of the ID's of the canonical genres.
+     */
+    abstract public int[] getCanonicalGenreIds();
 
     /**
      * Returns channel's ID of the program.

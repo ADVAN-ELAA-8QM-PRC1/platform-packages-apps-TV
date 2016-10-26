@@ -204,17 +204,17 @@ public class ProgramManager {
                 @Override
                 public void onLoadFinished() {
                     mChannelDataLoaded = true;
-                    updateChannels(true, false);
+                    updateChannels(false);
                 }
 
                 @Override
                 public void onChannelListUpdated() {
-                    updateChannels(true, false);
+                    updateChannels(false);
                 }
 
                 @Override
                 public void onChannelBrowsableChanged() {
-                    updateChannels(true, false);
+                    updateChannels(false);
                 }
             };
 
@@ -222,7 +222,7 @@ public class ProgramManager {
             new ProgramDataManager.Listener() {
                 @Override
                 public void onProgramUpdated() {
-                    updateTableEntries(true, true);
+                    updateTableEntries(true);
                 }
             };
 
@@ -434,18 +434,16 @@ public class ProgramManager {
 
     // Note that This can be happens only if program guide isn't shown
     // because an user has to select channels as browsable through UI.
-    private void updateChannels(boolean notify, boolean clearPreviousTableEntries) {
+    private void updateChannels(boolean clearPreviousTableEntries) {
         if (DEBUG) Log.d(TAG, "updateChannels");
         mChannels = mChannelDataManager.getBrowsableChannelList();
         mSelectedGenreId = GenreItems.ID_ALL_CHANNELS;
         mFilteredChannels = mChannels;
-        if (notify) {
-            notifyChannelsUpdated();
-        }
-        updateTableEntries(notify, clearPreviousTableEntries);
+        notifyChannelsUpdated();
+        updateTableEntries(clearPreviousTableEntries);
     }
 
-    private void updateTableEntries(boolean notify, boolean clear) {
+    private void updateTableEntries(boolean clear) {
         if (clear) {
             mChannelIdEntriesMap.clear();
         }
@@ -494,9 +492,7 @@ public class ProgramManager {
             }
         }
 
-        if (notify) {
-            notifyTableEntriesUpdated();
-        }
+        notifyTableEntriesUpdated();
         buildGenreFilters();
     }
 
@@ -579,7 +575,7 @@ public class ProgramManager {
         }
 
         mProgramDataManager.setPrefetchTimeRange(mStartUtcMillis);
-        updateChannels(true, true);
+        updateChannels(true);
         setTimeRange(startUtcMillis, endUtcMillis);
     }
 
