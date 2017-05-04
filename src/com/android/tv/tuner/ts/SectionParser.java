@@ -22,7 +22,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
-import com.android.tv.tuner.data.nano.Channel;
+import com.android.tv.tuner.data.Channel;
 import com.android.tv.tuner.data.PsiData.PatItem;
 import com.android.tv.tuner.data.PsiData.PmtItem;
 import com.android.tv.tuner.data.PsipData.Ac3AudioDescriptor;
@@ -39,8 +39,8 @@ import com.android.tv.tuner.data.PsipData.RatingRegion;
 import com.android.tv.tuner.data.PsipData.RegionalRating;
 import com.android.tv.tuner.data.PsipData.TsDescriptor;
 import com.android.tv.tuner.data.PsipData.VctItem;
-import com.android.tv.tuner.data.nano.Track.AtscAudioTrack;
-import com.android.tv.tuner.data.nano.Track.AtscCaptionTrack;
+import com.android.tv.tuner.data.Track.AtscAudioTrack;
+import com.android.tv.tuner.data.Track.AtscCaptionTrack;
 import com.android.tv.tuner.util.ByteArrayBuffer;
 
 import com.ibm.icu.text.UnicodeDecompressor;
@@ -367,6 +367,10 @@ public class SectionParser {
         mParsedEttItems.clear();
     }
 
+    public void resetVersionNumbers() {
+        mSectionVersionMap.clear();
+    }
+
     private void parseSection(byte[] data) {
         if (!checkSanity(data)) {
             Log.d(TAG, "Bad CRC!");
@@ -510,10 +514,8 @@ public class SectionParser {
             pos += 11 + descriptorsLength;
             results.add(new MgtItem(tableType, tableTypePid));
         }
-        if ((data[pos] & 0xf0) != 0xf0) {
-            Log.e(TAG, "Broken MGT.");
-            return false;
-        }
+        // Skip the remaining descriptor part which we don't use.
+
         if (mListener != null) {
             mListener.onMgtParsed(results);
         }
@@ -716,6 +718,9 @@ public class SectionParser {
                 AtscAudioTrack audioTrack = new AtscAudioTrack();
                 if (audioDescriptor.getLanguage() != null) {
                     audioTrack.language = audioDescriptor.getLanguage();
+                }
+                if (audioTrack.language == null) {
+                    audioTrack.language = "";
                 }
                 audioTrack.audioType = AtscAudioTrack.AUDIOTYPE_UNDEFINED;
                 audioTrack.channelCount = audioDescriptor.getNumChannels();
@@ -948,6 +953,7 @@ public class SectionParser {
             pos += 3;
             boolean ccType = (data[pos] & 0x80) != 0;
             if (!ccType) {
+                pos +=3;
                 continue;
             }
             int captionServiceNumber = data[pos] & 0x3f;
