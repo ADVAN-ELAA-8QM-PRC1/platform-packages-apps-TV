@@ -24,10 +24,7 @@ import android.util.Log;
 import android.util.Range;
 
 import com.android.tv.common.SoftPreconditions;
-import com.android.tv.dvr.data.RecordedProgram;
-import com.android.tv.dvr.data.ScheduledRecording;
-import com.android.tv.dvr.data.ScheduledRecording.RecordingState;
-import com.android.tv.dvr.data.SeriesRecording;
+import com.android.tv.dvr.ScheduledRecording.RecordingState;
 import com.android.tv.util.Clock;
 
 import java.util.ArrayList;
@@ -40,7 +37,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * A DVR Data manager that stores values in memory suitable for testing.
  */
-public final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
+final class DvrDataManagerInMemoryImpl extends BaseDvrDataManager {
     private final static String TAG = "DvrDataManagerInMemory";
     private final AtomicLong mNextId = new AtomicLong(1);
     private final Map<Long, ScheduledRecording> mScheduledRecordings = new HashMap<>();

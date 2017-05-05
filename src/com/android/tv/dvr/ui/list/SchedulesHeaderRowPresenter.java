@@ -30,14 +30,15 @@ import android.widget.TextView;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
-import com.android.tv.dvr.data.SeriesRecording;
-import com.android.tv.dvr.ui.DvrUiHelper;
+import com.android.tv.dvr.DvrUiHelper;
+import com.android.tv.dvr.SeriesRecording;
+import com.android.tv.dvr.ui.DvrSchedulesActivity;
 import com.android.tv.dvr.ui.list.SchedulesHeaderRow.SeriesRecordingHeaderRow;
 
 /**
  * A base class for RowPresenter for {@link SchedulesHeaderRow}
  */
-abstract class SchedulesHeaderRowPresenter extends RowPresenter {
+public abstract class SchedulesHeaderRowPresenter extends RowPresenter {
     private Context mContext;
 
     public SchedulesHeaderRowPresenter(Context context) {
@@ -78,7 +79,7 @@ abstract class SchedulesHeaderRowPresenter extends RowPresenter {
     }
 
     /**
-     * A presenter for {@link SchedulesHeaderRow.DateHeaderRow}.
+     * A presenter for {@link com.android.tv.dvr.ui.list.SchedulesHeaderRow.DateHeaderRow}.
      */
     public static class DateHeaderRowPresenter extends SchedulesHeaderRowPresenter {
         public DateHeaderRowPresenter(Context context) {
@@ -92,7 +93,7 @@ abstract class SchedulesHeaderRowPresenter extends RowPresenter {
 
         /**
          * A ViewHolder for
-         * {@link SchedulesHeaderRow.DateHeaderRow}.
+         * {@link com.android.tv.dvr.ui.list.SchedulesHeaderRow.DateHeaderRow}.
          */
         public static class DateHeaderRowViewHolder extends SchedulesHeaderRowViewHolder {
             public DateHeaderRowViewHolder(Context context, ViewGroup parent) {
@@ -151,9 +152,9 @@ abstract class SchedulesHeaderRowPresenter extends RowPresenter {
             headerViewHolder.mSeriesSettingsButton.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View view) {
+                    // TODO: pass channel list for settings.
                     DvrUiHelper.startSeriesSettingsActivity(getContext(),
-                            header.getSeriesRecording().getId(),
-                            header.getPrograms(), false, false, false, null);
+                            header.getSeriesRecording().getId(), null, false, false, false);
                 }
             });
             headerViewHolder.mToggleStartStopButton.setOnClickListener(new OnClickListener() {
@@ -168,9 +169,9 @@ abstract class SchedulesHeaderRowPresenter extends RowPresenter {
                                 .build();
                         TvApplication.getSingletons(getContext()).getDvrManager()
                                 .updateSeriesRecording(seriesRecording);
+                        // TODO: pass channel list for settings.
                         DvrUiHelper.startSeriesSettingsActivity(getContext(),
-                                header.getSeriesRecording().getId(),
-                                header.getPrograms(), false, false, false, null);
+                                header.getSeriesRecording().getId(), null, false, false, false);
                     } else {
                         DvrUiHelper.showCancelAllSeriesRecordingDialog(
                                 (DvrSchedulesActivity) view.getContext(),
@@ -181,8 +182,11 @@ abstract class SchedulesHeaderRowPresenter extends RowPresenter {
         }
 
         private void setTextDrawable(TextView textView, Drawable drawableStart) {
-            textView.setCompoundDrawablesRelativeWithIntrinsicBounds(drawableStart, null, null,
-                    null);
+            if (mLtr) {
+                textView.setCompoundDrawablesWithIntrinsicBounds(drawableStart, null, null, null);
+            } else {
+                textView.setCompoundDrawablesWithIntrinsicBounds(null, null, drawableStart, null);
+            }
         }
 
         /**

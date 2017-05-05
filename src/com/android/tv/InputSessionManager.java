@@ -37,6 +37,7 @@ import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Log;
 
+import com.android.tv.common.SoftPreconditions;
 import com.android.tv.data.Channel;
 import com.android.tv.ui.TunableTvView;
 import com.android.tv.ui.TunableTvView.OnTuneListener;
@@ -71,8 +72,6 @@ public class InputSessionManager {
     private final Set<RecordingSession> mRecordingSessions =
             Collections.synchronizedSet(new ArraySet<>());
     private final Set<OnTvViewChannelChangeListener> mOnTvViewChannelChangeListeners =
-            new ArraySet<>();
-    private final Set<OnRecordingSessionChangeListener> mOnRecordingSessionChangeListeners =
             new ArraySet<>();
 
     public InputSessionManager(Context context) {
@@ -114,9 +113,6 @@ public class InputSessionManager {
         RecordingSession session = new RecordingSession(inputId, tag, callback, handler, endTimeMs);
         mRecordingSessions.add(session);
         if (DEBUG) Log.d(TAG, "Recording session created: " + session);
-        for (OnRecordingSessionChangeListener listener : mOnRecordingSessionChangeListeners) {
-            listener.onRecordingSessionChange(true, mRecordingSessions.size());
-        }
         return session;
     }
 
@@ -127,9 +123,6 @@ public class InputSessionManager {
         mRecordingSessions.remove(session);
         session.release();
         if (DEBUG) Log.d(TAG, "Recording session released: " + session);
-        for (OnRecordingSessionChangeListener listener : mOnRecordingSessionChangeListeners) {
-            listener.onRecordingSessionChange(false, mRecordingSessions.size());
-        }
     }
 
     /**
@@ -155,17 +148,9 @@ public class InputSessionManager {
         }
     }
 
-    /** Adds the {@link OnRecordingSessionChangeListener}. */
-    public void addOnRecordingSessionChangeListener(OnRecordingSessionChangeListener listener) {
-        mOnRecordingSessionChangeListeners.add(listener);
-    }
-
-    /** Removes the {@link OnRecordingSessionChangeListener}. */
-    public void removeRecordingSessionChangeListener(OnRecordingSessionChangeListener listener) {
-        mOnRecordingSessionChangeListeners.remove(listener);
-    }
-
-    /** Returns the current {@link TvView} channel. */
+    /**
+     * Returns the current {@link TvView} channel.
+     */
     @MainThread
     public Uri getCurrentTvViewChannelUri() {
         for (TvViewSession session : mTvViewSessions) {
@@ -560,10 +545,5 @@ public class InputSessionManager {
      */
     public interface OnTvViewChannelChangeListener {
         void onTvViewChannelChange(@Nullable Uri channelUri);
-    }
-
-    /** Called when recording session is created or destroyed. */
-    public interface OnRecordingSessionChangeListener {
-        void onRecordingSessionChange(boolean create, int count);
     }
 }

@@ -17,7 +17,6 @@
 package com.android.tv.dvr.ui.list;
 
 import android.annotation.TargetApi;
-import android.content.Context;
 import android.database.ContentObserver;
 import android.media.tv.TvContract.Programs;
 import android.net.Uri;
@@ -36,13 +35,11 @@ import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.Program;
-import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrDataManager.SeriesRecordingListener;
-import com.android.tv.dvr.data.SeriesRecording;
-import com.android.tv.dvr.provider.EpisodicProgramLoadTask;
-import com.android.tv.dvr.ui.BigArguments;
+import com.android.tv.dvr.EpisodicProgramLoadTask;
+import com.android.tv.dvr.SeriesRecording;
+import com.android.tv.dvr.ui.list.SchedulesHeaderRowPresenter.SeriesRecordingHeaderRowPresenter;
 
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -50,22 +47,20 @@ import java.util.List;
  */
 @TargetApi(Build.VERSION_CODES.N)
 public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
+    private static final String TAG = "DvrSeriesSchedulesFragment";
     /**
      * The key for series recording whose scheduled recording list will be displayed.
-     * Type: {@link SeriesRecording}
      */
     public static final String SERIES_SCHEDULES_KEY_SERIES_RECORDING =
             "series_schedules_key_series_recording";
     /**
-     * The key for programs which belong to the series recording whose scheduled recording list
-     * will be displayed.
-     * Type: List<{@link Program}>
+     * The key for programs belong to the series recording whose scheduled recording
+     * list will be displayed.
      */
     public static final String SERIES_SCHEDULES_KEY_SERIES_PROGRAMS =
             "series_schedules_key_series_programs";
 
     private ChannelDataManager mChannelDataManager;
-    private DvrDataManager mDvrDataManager;
     private SeriesRecording mSeriesRecording;
     private List<Program> mPrograms;
     private EpisodicProgramLoadTask mProgramLoadTask;
@@ -92,22 +87,20 @@ public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
                                 && getRowsAdapter() instanceof SeriesScheduleRowAdapter) {
                             ((SeriesScheduleRowAdapter) getRowsAdapter())
                                     .onSeriesRecordingUpdated(r);
-                            mSeriesRecording = r;
-                            updateEmptyMessage();
                             return;
                         }
                     }
                 }
             };
 
-    private final Handler mHandler = new Handler(Looper.getMainLooper());
-    private final ContentObserver mContentObserver = new ContentObserver(mHandler) {
-        @Override
-        public void onChange(boolean selfChange, Uri uri) {
-            super.onChange(selfChange, uri);
-            executeProgramLoadingTask();
-        }
-    };
+    private final ContentObserver mContentObserver =
+            new ContentObserver(new Handler(Looper.getMainLooper())) {
+                @Override
+                public void onChange(boolean selfChange, Uri uri) {
+                    super.onChange(selfChange, uri);
+                    executeProgramLoadingTask();
+                }
+            };
 
     private final ChannelDataManager.Listener mChannelListener = new ChannelDataManager.Listener() {
         @Override
@@ -127,28 +120,17 @@ public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
     }
 
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
+    public void onCreate(Bundle savedInstanceState) {
         Bundle args = getArguments();
         if (args != null) {
             mSeriesRecording = args.getParcelable(SERIES_SCHEDULES_KEY_SERIES_RECORDING);
-            mPrograms = (List<Program>) BigArguments.getArgument(
-                    SERIES_SCHEDULES_KEY_SERIES_PROGRAMS);
-            BigArguments.reset();
+            mPrograms = args.getParcelableArrayList(SERIES_SCHEDULES_KEY_SERIES_PROGRAMS);
         }
-        if (args == null || mPrograms == null) {
-            getActivity().finish();
-        }
-    }
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ApplicationSingletons singletons = TvApplication.getSingletons(getContext());
+        singletons.getDvrDataManager().addSeriesRecordingListener(mSeriesRecordingListener);
         mChannelDataManager = singletons.getChannelDataManager();
         mChannelDataManager.addListener(mChannelListener);
-        mDvrDataManager = singletons.getDvrDataManager();
-        mDvrDataManager.addSeriesRecordingListener(mSeriesRecordingListener);
         getContext().getContentResolver().registerContentObserver(Programs.CONTENT_URI, true,
                 mContentObserver);
     }
@@ -162,16 +144,8 @@ public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
 
     private void onProgramsUpdated() {
         ((SeriesScheduleRowAdapter) getRowsAdapter()).setPrograms(mPrograms);
-        updateEmptyMessage();
-    }
-
-    private void updateEmptyMessage() {
         if (mPrograms == null || mPrograms.isEmpty()) {
-            if (mSeriesRecording.getState() == SeriesRecording.STATE_SERIES_STOPPED) {
-                showEmptyMessage(R.string.dvr_series_schedules_stopped_empty_state);
-            } else {
-                showEmptyMessage(R.string.dvr_series_schedules_empty_state);
-            }
+            showEmptyMessage(R.string.dvr_series_schedules_empty_state);
         } else {
             hideEmptyMessage();
         }
@@ -184,15 +158,15 @@ public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
             mProgramLoadTask = null;
         }
         getContext().getContentResolver().unregisterContentObserver(mContentObserver);
-        mHandler.removeCallbacksAndMessages(null);
         mChannelDataManager.removeListener(mChannelListener);
-        mDvrDataManager.removeSeriesRecordingListener(mSeriesRecordingListener);
+        TvApplication.getSingletons(getContext()).getDvrDataManager()
+                .removeSeriesRecordingListener(mSeriesRecordingListener);
         super.onDestroy();
     }
 
     @Override
     public SchedulesHeaderRowPresenter onCreateHeaderRowPresenter() {
-        return new SchedulesHeaderRowPresenter.SeriesRecordingHeaderRowPresenter(getContext());
+        return new SeriesRecordingHeaderRowPresenter(getContext());
     }
 
     @Override
@@ -221,7 +195,7 @@ public class DvrSeriesSchedulesFragment extends BaseDvrSchedulesFragment {
         mProgramLoadTask = new EpisodicProgramLoadTask(getContext(), mSeriesRecording) {
             @Override
             protected void onPostExecute(List<Program> programs) {
-                mPrograms = programs == null ? Collections.EMPTY_LIST : programs;
+                mPrograms = programs;
                 onProgramsUpdated();
             }
         };

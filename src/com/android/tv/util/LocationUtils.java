@@ -16,9 +16,7 @@
 
 package com.android.tv.util;
 
-import android.Manifest;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -27,7 +25,6 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.android.tv.tuner.util.PostalCodeUtils;
 
 import java.io.IOException;
 import java.util.List;
@@ -42,7 +39,6 @@ public class LocationUtils {
 
     private static Context sApplicationContext;
     private static Address sAddress;
-    private static String sCountry;
     private static IOException sError;
 
     /**
@@ -63,19 +59,6 @@ public class LocationUtils {
         return null;
     }
 
-    /**
-     * Returns the current country.
-     */
-    public static synchronized String getCurrentCountry(Context context) {
-        if (sCountry != null) {
-            return sCountry;
-        }
-        if (sCountry == null) {
-            sCountry = context.getResources().getConfiguration().locale.getCountry();
-        }
-        return sCountry;
-    }
-
     private static void updateAddress(Location location) {
         if (DEBUG) Log.d(TAG, "Updating address with " + location);
         if (location == null) {
@@ -85,14 +68,9 @@ public class LocationUtils {
         try {
             List<Address> addresses = geocoder.getFromLocation(
                     location.getLatitude(), location.getLongitude(), 1);
-            if (addresses != null && !addresses.isEmpty()) {
+            if (addresses != null) {
                 sAddress = addresses.get(0);
                 if (DEBUG) Log.d(TAG, "Got " + sAddress);
-                try {
-                    PostalCodeUtils.updatePostalCode(sApplicationContext);
-                } catch (Exception e) {
-                    // Do nothing
-                }
             } else {
                 if (DEBUG) Log.d(TAG, "No address returned");
             }

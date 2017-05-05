@@ -19,6 +19,7 @@ package com.android.tv.common.feature;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
+
 import com.android.tv.common.SharedPreferencesUtils;
 
 /**

@@ -140,7 +140,6 @@ public class Cea708Parser {
     private int mCommand = 0;
     private int mListenServiceNumber = 0;
     private boolean mDtvCcPacking = false;
-    private boolean mFirstServiceNumberDiscovered;
 
     // Assign a dummy listener in order to avoid null checks.
     private OnCea708ParserListener mListener = new OnCea708ParserListener() {
@@ -333,14 +332,12 @@ public class Cea708Parser {
                 mDiscoveredNumBytes.put(
                         serviceNumber, blockSize + mDiscoveredNumBytes.get(serviceNumber, 0));
             }
-            if (mLastDiscoveryLaunchedMs + DISCOVERY_PERIOD_MS < SystemClock.elapsedRealtime()
-                    || !mFirstServiceNumberDiscovered) {
+            if (mLastDiscoveryLaunchedMs + DISCOVERY_PERIOD_MS < SystemClock.elapsedRealtime()) {
                 for (int i = 0; i < mDiscoveredNumBytes.size(); ++i) {
                     int discoveredNumBytes = mDiscoveredNumBytes.valueAt(i);
                     if (discoveredNumBytes >= DISCOVERY_NUM_BYTES_THRESHOLD) {
                         int discoveredServiceNumber = mDiscoveredNumBytes.keyAt(i);
                         mListener.discoverServiceNumber(discoveredServiceNumber);
-                        mFirstServiceNumberDiscovered = true;
                     }
                 }
                 mDiscoveredNumBytes.clear();

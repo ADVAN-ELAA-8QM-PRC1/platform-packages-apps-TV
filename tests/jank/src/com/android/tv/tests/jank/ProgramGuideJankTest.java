@@ -30,6 +30,7 @@ import com.android.tv.testing.uihelper.ByResource;
 import com.android.tv.testing.uihelper.Constants;
 import com.android.tv.testing.uihelper.LiveChannelsUiDeviceHelper;
 import com.android.tv.testing.uihelper.MenuHelper;
+import com.android.tv.testing.uihelper.UiDeviceUtils;
 
 /**
  * Jank tests for the program guide.
@@ -82,7 +83,7 @@ public class ProgramGuideJankTest extends JankTestBase {
     }
 
     @JankTest(expectedFrames = EXPECTED_FRAMES,
-            beforeLoop = "showAndFocusProgramGuide",
+            beforeLoop = "showProgramGuide",
             afterLoop = "clearProgramGuide")
     @GfxMonitor(processName = Utils.LIVE_CHANNELS_PROCESS_NAME)
     public void testScrollDown() {
@@ -94,7 +95,7 @@ public class ProgramGuideJankTest extends JankTestBase {
     }
 
     @JankTest(expectedFrames = EXPECTED_FRAMES,
-            beforeLoop = "showAndFocusProgramGuide",
+            beforeLoop = "showProgramGuide",
             afterLoop = "clearProgramGuide")
     @GfxMonitor(processName = Utils.LIVE_CHANNELS_PROCESS_NAME)
     public void testScrollRight() {
@@ -127,14 +128,8 @@ public class ProgramGuideJankTest extends JankTestBase {
         assertWaitForCondition(mDevice, Until.gone(Constants.PROGRAM_GUIDE));
     }
 
-    public void showProgramGuide() {
-        selectProgramGuideMenuItem();
-        mDevice.pressDPadCenter();
-        assertWaitForCondition(mDevice, Until.hasObject(Constants.PROGRAM_GUIDE));
-    }
-
     // It's public to be used with @JankTest annotation.
-    public void showAndFocusProgramGuide() {
+    public void showProgramGuide() {
         selectProgramGuideMenuItem();
         mDevice.pressDPadCenter();
         assertWaitForCondition(mDevice, Until.hasObject(Constants.PROGRAM_GUIDE));

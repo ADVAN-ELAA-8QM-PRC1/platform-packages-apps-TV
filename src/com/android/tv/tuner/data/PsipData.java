@@ -20,11 +20,11 @@ import android.support.annotation.NonNull;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
 
-import com.android.tv.tuner.data.Track.AtscAudioTrack;
-import com.android.tv.tuner.data.Track.AtscCaptionTrack;
+import com.android.tv.tuner.data.nano.Track.AtscAudioTrack;
+import com.android.tv.tuner.data.nano.Track.AtscCaptionTrack;
 import com.android.tv.tuner.ts.SectionParser;
 import com.android.tv.tuner.util.ConvertUtils;
-import com.android.tv.util.StringUtils;
+import com.android.tv.tuner.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;

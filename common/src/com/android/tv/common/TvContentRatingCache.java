@@ -43,7 +43,6 @@ public final class TvContentRatingCache implements MemoryManageable {
         return INSTANCE;
     }
 
-    // @GuardedBy("TvContentRatingCache.this")
     private final Map<String, TvContentRating[]> mRatingsMultiMap = new ArrayMap<>();
 
     /**
@@ -52,7 +51,7 @@ public final class TvContentRatingCache implements MemoryManageable {
      * Returns {@code null} if the string is empty or contains no valid ratings.
      */
     @Nullable
-    public synchronized TvContentRating[] getRatings(String commaSeparatedRatings) {
+    public TvContentRating[] getRatings(String commaSeparatedRatings) {
         if (TextUtils.isEmpty(commaSeparatedRatings)) {
             return null;
         }
@@ -137,7 +136,7 @@ public final class TvContentRatingCache implements MemoryManageable {
     }
 
     @Override
-    public synchronized void performTrimMemory(int level) {
+    public void performTrimMemory(int level) {
         mRatingsMultiMap.clear();
     }
 

@@ -24,7 +24,6 @@ import android.view.ViewGroup;
 public abstract class Item {
     private View mItemView;
     private boolean mEnabled = true;
-    private boolean mClickable = true;
 
     public void setEnabled(boolean enabled) {
         if (mEnabled != enabled) {
@@ -32,16 +31,6 @@ public abstract class Item {
             if (mItemView != null) {
                 setEnabledInternal(mItemView, enabled);
             }
-        }
-    }
-
-    /**
-     * Sets the item to be clickable or not.
-     */
-    public void setClickable(boolean clickable) {
-        mClickable = clickable;
-        if (mItemView != null) {
-            mItemView.setClickable(clickable);
         }
     }
 
@@ -75,7 +64,6 @@ public abstract class Item {
      */
     protected void onUpdate() {
         setEnabledInternal(mItemView, mEnabled);
-        mItemView.setClickable(mClickable);
     }
 
     protected abstract void onSelected();

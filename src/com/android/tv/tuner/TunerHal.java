@@ -20,9 +20,6 @@ import android.content.Context;
 import android.support.annotation.IntDef;
 import android.support.annotation.StringDef;
 import android.util.Log;
-import android.util.Pair;
-
-import com.android.tv.Features;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -51,7 +48,6 @@ public abstract class TunerHal implements AutoCloseable {
 
     public static final int TUNER_TYPE_BUILT_IN = 1;
     public static final int TUNER_TYPE_USB = 2;
-    public static final int TUNER_TYPE_NETWORK = 3;
 
     protected static final int PID_PAT = 0;
     protected static final int PID_ATSC_SI_BASE = 0x1ffb;
@@ -73,33 +69,31 @@ public abstract class TunerHal implements AutoCloseable {
      */
     public synchronized static TunerHal createInstance(Context context) {
         TunerHal tunerHal = null;
-        if (useBuiltInTuner(context)) {
+        if (getTunerType(context) == TUNER_TYPE_BUILT_IN) {
         }
-        if (tunerHal == null && UsbTunerHal.getNumberOfDevices(context) > 0) {
+        if (tunerHal == null) {
             tunerHal = new UsbTunerHal(context);
         }
-        return tunerHal != null && tunerHal.openFirstAvailable() ? tunerHal : null;
+        if (tunerHal.openFirstAvailable()) {
+            return tunerHal;
+        }
+        return null;
     }
 
     /**
      * Gets the number of tuner devices currently present.
      */
-    public static Pair<Integer, Integer> getTunerTypeAndCount(Context context) {
-        if (useBuiltInTuner(context)) {
+    public static int getTunerCount(Context context) {
+        if (getTunerType(context) == TUNER_TYPE_BUILT_IN) {
         }
-        int usbTunerCount = UsbTunerHal.getNumberOfDevices(context);
-        if (usbTunerCount > 0) {
-            return new Pair<>(TUNER_TYPE_USB, usbTunerCount);
-        }
-        return new Pair<>(null, 0);
+        return UsbTunerHal.getNumberOfDevices(context);
     }
 
     /**
-     * Returns if tuner input service would use built-in tuners instead of USB tuners or network
-     * tuners.
+     * Gets the type of tuner devices currently used.
      */
-    static boolean useBuiltInTuner(Context context) {
-        return false;
+    public static int getTunerType(Context context) {
+        return TUNER_TYPE_USB;
     }
 
     protected TunerHal(Context context) {
@@ -110,14 +104,6 @@ public abstract class TunerHal implements AutoCloseable {
 
     protected boolean isStreaming() {
         return mIsStreaming;
-    }
-
-    /**
-     * Returns {@code true} if this tuner HAL can be reused to save tuning time between channels
-     * of the same frequency.
-     */
-    public boolean isReusable() {
-        return true;
     }
 
     @Override
@@ -145,12 +131,9 @@ public abstract class TunerHal implements AutoCloseable {
      *
      * @param frequency a frequency of the channel to tune to
      * @param modulation a modulation method of the channel to tune to
-     * @param channelNumber channel number when channel number is already known. Some tuner HAL
-     *        may use channelNumber instead of frequency for tune.
      * @return {@code true} if the operation was successful, {@code false} otherwise
      */
-    public synchronized boolean tune(int frequency, @ModulationType String modulation,
-            String channelNumber) {
+    public synchronized boolean tune(int frequency, @ModulationType String modulation) {
         if (!isDeviceOpen()) {
             Log.e(TAG, "There's no available device");
             return false;

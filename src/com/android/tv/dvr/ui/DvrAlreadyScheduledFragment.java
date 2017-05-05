@@ -25,12 +25,15 @@ import android.support.annotation.NonNull;
 import android.support.v17.leanback.widget.GuidanceStylist.Guidance;
 import android.support.v17.leanback.widget.GuidedAction;
 import android.text.format.DateUtils;
+import android.widget.Toast;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
 import com.android.tv.data.Program;
 import com.android.tv.dvr.DvrManager;
-import com.android.tv.dvr.data.ScheduledRecording;
+import com.android.tv.dvr.DvrUiHelper;
+import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.util.Utils;
 
 import java.util.List;
 

@@ -24,6 +24,7 @@ import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
 import android.support.annotation.VisibleForTesting;
 import android.util.ArraySet;
+import android.util.LongSparseArray;
 import android.util.Range;
 
 import com.android.tv.ApplicationSingletons;
@@ -34,10 +35,7 @@ import com.android.tv.data.ChannelDataManager;
 import com.android.tv.data.Program;
 import com.android.tv.dvr.DvrDataManager.OnDvrScheduleLoadFinishedListener;
 import com.android.tv.dvr.DvrDataManager.ScheduledRecordingListener;
-import com.android.tv.dvr.recorder.InputTaskScheduler;
 import com.android.tv.util.CompositeComparator;
-import com.android.tv.dvr.data.ScheduledRecording;
-import com.android.tv.dvr.data.SeriesRecording;
 import com.android.tv.util.Utils;
 
 import java.util.ArrayList;
@@ -90,8 +88,9 @@ public class DvrScheduleManager {
     private final Map<String, List<ScheduledRecording>> mInputScheduleMap = new HashMap<>();
     // The inner map is a hash map from scheduled recording to its conflicting status, i.e.,
     // the boolean value true denotes the schedule is just partially conflicting, which means
-    // although there's conflict, it might still be recorded partially.
-    private final Map<String, Map<Long, ConflictInfo>> mInputConflictInfoMap = new HashMap<>();
+    // although there's conflictit, it might still be recorded partially.
+    private final Map<String, Map<ScheduledRecording, Boolean>> mInputConflictInfoMap =
+            new HashMap<>();
 
     private boolean mInitialized;
 
@@ -172,9 +171,10 @@ public class DvrScheduleManager {
                             mInputScheduleMap.remove(inputId);
                         }
                     }
-                    Map<Long, ConflictInfo> conflictInfo = mInputConflictInfoMap.get(inputId);
+                    Map<ScheduledRecording, Boolean> conflictInfo =
+                            mInputConflictInfoMap.get(inputId);
                     if (conflictInfo != null) {
-                        conflictInfo.remove(schedule.getId());
+                        conflictInfo.remove(schedule);
                         if (conflictInfo.isEmpty()) {
                             mInputConflictInfoMap.remove(inputId);
                         }
@@ -221,11 +221,21 @@ public class DvrScheduleManager {
                         mInputScheduleMap.remove(inputId);
                     }
                     // Update conflict list as well
-                    Map<Long, ConflictInfo> conflictInfo = mInputConflictInfoMap.get(inputId);
+                    Map<ScheduledRecording, Boolean> conflictInfo =
+                            mInputConflictInfoMap.get(inputId);
                     if (conflictInfo != null) {
-                        ConflictInfo oldConflictInfo = conflictInfo.get(schedule.getId());
-                        if (oldConflictInfo != null) {
-                            oldConflictInfo.schedule = schedule;
+                        // Compare ID because ScheduledRecording.equals() doesn't work if the state
+                        // is changed.
+                        ScheduledRecording oldSchedule = null;
+                        for (ScheduledRecording s : conflictInfo.keySet()) {
+                            if (s.getId() == schedule.getId()) {
+                                oldSchedule = s;
+                                break;
+                            }
+                        }
+                        if (oldSchedule != null) {
+                            conflictInfo.put(schedule, conflictInfo.get(oldSchedule));
+                            conflictInfo.remove(oldSchedule);
                         }
                     }
                 }
@@ -307,25 +317,24 @@ public class DvrScheduleManager {
         List<ScheduledRecording> addedConflicts = new ArrayList<>();
         List<ScheduledRecording> removedConflicts = new ArrayList<>();
         for (String inputId : mInputScheduleMap.keySet()) {
-            Map<Long, ConflictInfo> oldConflictInfo = mInputConflictInfoMap.get(inputId);
+            Map<ScheduledRecording, Boolean> oldConflictsInfo = mInputConflictInfoMap.get(inputId);
             Map<Long, ScheduledRecording> oldConflictMap = new HashMap<>();
-            if (oldConflictInfo != null) {
-                for (ConflictInfo conflictInfo : oldConflictInfo.values()) {
-                    oldConflictMap.put(conflictInfo.schedule.getId(), conflictInfo.schedule);
+            if (oldConflictsInfo != null) {
+                for (ScheduledRecording r : oldConflictsInfo.keySet()) {
+                    oldConflictMap.put(r.getId(), r);
                 }
             }
-            List<ConflictInfo> conflicts = getConflictingSchedulesInfo(inputId);
-            if (conflicts.isEmpty()) {
+            Map<ScheduledRecording, Boolean> conflictInfo = getConflictingSchedulesInfo(inputId);
+            if (conflictInfo.isEmpty()) {
                 mInputConflictInfoMap.remove(inputId);
             } else {
-                Map<Long, ConflictInfo> conflictInfos = new HashMap<>();
-                for (ConflictInfo conflictInfo : conflicts) {
-                    conflictInfos.put(conflictInfo.schedule.getId(), conflictInfo);
-                    if (oldConflictMap.remove(conflictInfo.schedule.getId()) == null) {
-                        addedConflicts.add(conflictInfo.schedule);
+                mInputConflictInfoMap.put(inputId, conflictInfo);
+                List<ScheduledRecording> conflicts = new ArrayList<>(conflictInfo.keySet());
+                for (ScheduledRecording r : conflicts) {
+                    if (oldConflictMap.remove(r.getId()) == null) {
+                        addedConflicts.add(r);
                     }
                 }
-                mInputConflictInfoMap.put(inputId, conflictInfos);
             }
             removedConflicts.addAll(oldConflictMap.values());
         }
@@ -556,7 +565,8 @@ public class DvrScheduleManager {
     }
 
     /**
-     * Returns list of all conflicting scheduled recordings for the given {@code seriesRecording}
+     * Returns list of all conflicting scheduled recordings with schedules belonging to {@code
+     * seriesRecording}
      * recording.
      * <p>
      * Any empty list means there is no conflicts.
@@ -571,18 +581,9 @@ public class DvrScheduleManager {
         if (input == null || !input.canRecord() || input.getTunerCount() <= 0) {
             return Collections.emptyList();
         }
-        List<ScheduledRecording> scheduledRecordingForSeries = mDataManager.getScheduledRecordings(
+        List<ScheduledRecording> schedulesForSeries = mDataManager.getScheduledRecordings(
                 seriesRecording.getId());
-        List<ScheduledRecording> availableScheduledRecordingForSeries = new ArrayList<>();
-        for (ScheduledRecording scheduledRecording : scheduledRecordingForSeries) {
-            if (scheduledRecording.isNotStarted() || scheduledRecording.isInProgress()) {
-                availableScheduledRecordingForSeries.add(scheduledRecording);
-            }
-        }
-        if (availableScheduledRecordingForSeries.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return getConflictingSchedules(input, availableScheduledRecordingForSeries);
+        return getConflictingSchedules(input, schedulesForSeries);
     }
 
     /**
@@ -616,16 +617,16 @@ public class DvrScheduleManager {
      * the given input.
      */
     @NonNull
-    private List<ConflictInfo> getConflictingSchedulesInfo(String inputId) {
+    private Map<ScheduledRecording, Boolean> getConflictingSchedulesInfo(String inputId) {
         SoftPreconditions.checkState(mInitialized, TAG, "Not initialized yet");
         TvInputInfo input = Utils.getTvInputInfoForInputId(mContext, inputId);
         SoftPreconditions.checkState(input != null, TAG, "Can't find input for : " + inputId);
         if (!mInitialized || input == null) {
-            return Collections.emptyList();
+            return Collections.emptyMap();
         }
         List<ScheduledRecording> schedules = mInputScheduleMap.get(input.getId());
         if (schedules == null || schedules.isEmpty()) {
-            return Collections.emptyList();
+            return Collections.emptyMap();
         }
         return getConflictingSchedulesInfo(schedules, input.getTunerCount());
     }
@@ -644,8 +645,8 @@ public class DvrScheduleManager {
         if (!mInitialized || input == null) {
             return false;
         }
-        Map<Long, ConflictInfo> conflicts = mInputConflictInfoMap.get(input.getId());
-        return conflicts != null && conflicts.containsKey(schedule.getId());
+        Map<ScheduledRecording, Boolean> conflicts = mInputConflictInfoMap.get(input.getId());
+        return conflicts != null && conflicts.containsKey(schedule);
     }
 
     /**
@@ -663,12 +664,8 @@ public class DvrScheduleManager {
         if (!mInitialized || input == null) {
             return false;
         }
-        Map<Long, ConflictInfo> conflicts = mInputConflictInfoMap.get(input.getId());
-        if (conflicts != null) {
-            ConflictInfo conflictInfo = conflicts.get(schedule.getId());
-            return conflictInfo != null && conflictInfo.partialConflict;
-        }
-        return false;
+        Map<ScheduledRecording, Boolean> conflicts = mInputConflictInfoMap.get(input.getId());
+        return conflicts != null && conflicts.getOrDefault(schedule, false);
     }
 
     /**
@@ -816,17 +813,15 @@ public class DvrScheduleManager {
     @VisibleForTesting
     static List<ScheduledRecording> getConflictingSchedules(
             List<ScheduledRecording> schedules, int tunerCount, List<Range<Long>> periods) {
-        List<ScheduledRecording> result = new ArrayList<>();
-        for (ConflictInfo conflictInfo :
-                getConflictingSchedulesInfo(schedules, tunerCount, periods)) {
-            result.add(conflictInfo.schedule);
-        }
+        List<ScheduledRecording> result = new ArrayList<>(
+                getConflictingSchedulesInfo(schedules, tunerCount, periods).keySet());
+        Collections.sort(result, RESULT_COMPARATOR);
         return result;
     }
 
     @VisibleForTesting
-    static List<ConflictInfo> getConflictingSchedulesInfo(List<ScheduledRecording> schedules,
-            int tunerCount) {
+    static Map<ScheduledRecording, Boolean> getConflictingSchedulesInfo(
+            List<ScheduledRecording> schedules, int tunerCount) {
         return getConflictingSchedulesInfo(schedules, tunerCount, null);
     }
 
@@ -841,13 +836,13 @@ public class DvrScheduleManager {
      *         to be partially recorded under the given schedules and tuner count {@code true},
      *         or not {@code false}.
      */
-    private static List<ConflictInfo> getConflictingSchedulesInfo(
+    private static Map<ScheduledRecording, Boolean> getConflictingSchedulesInfo(
             List<ScheduledRecording> schedules, int tunerCount, List<Range<Long>> periods) {
         List<ScheduledRecording> schedulesToCheck = new ArrayList<>(schedules);
         // Sort by the same order as that in InputTaskScheduler.
         Collections.sort(schedulesToCheck, InputTaskScheduler.getRecordingOrderComparator());
         List<ScheduledRecording> recordings = new ArrayList<>();
-        Map<ScheduledRecording, ConflictInfo> conflicts = new HashMap<>();
+        Map<ScheduledRecording, Boolean> conflicts = new HashMap<>();
         Map<ScheduledRecording, ScheduledRecording> modified2OriginalSchedules = new HashMap<>();
         // Simulate InputTaskScheduler.
         while (!schedulesToCheck.isEmpty()) {
@@ -858,29 +853,26 @@ public class DvrScheduleManager {
                 if (modified2OriginalSchedules.containsKey(schedule)) {
                     // Schedule has been modified, which means it's already conflicted.
                     // Modify its state to partially conflicted.
-                    ScheduledRecording originalSchedule = modified2OriginalSchedules.get(schedule);
-                    conflicts.put(originalSchedule, new ConflictInfo(originalSchedule, true));
+                    conflicts.put(modified2OriginalSchedules.get(schedule), true);
                 }
             } else {
                 ScheduledRecording candidate = findReplaceableRecording(recordings, schedule);
                 if (candidate != null) {
                     if (!modified2OriginalSchedules.containsKey(candidate)) {
-                        conflicts.put(candidate, new ConflictInfo(candidate, true));
+                        conflicts.put(candidate, true);
                     }
                     recordings.remove(candidate);
                     recordings.add(schedule);
                     if (modified2OriginalSchedules.containsKey(schedule)) {
                         // Schedule has been modified, which means it's already conflicted.
                         // Modify its state to partially conflicted.
-                        ScheduledRecording originalSchedule =
-                                modified2OriginalSchedules.get(schedule);
-                        conflicts.put(originalSchedule, new ConflictInfo(originalSchedule, true));
+                        conflicts.put(modified2OriginalSchedules.get(schedule), true);
                     }
                 } else {
                     if (!modified2OriginalSchedules.containsKey(schedule)) {
                         // if schedule has been modified, it's already conflicted.
                         // No need to add it again.
-                        conflicts.put(schedule, new ConflictInfo(schedule, false));
+                        conflicts.put(schedule, false);
                     }
                     long earliestEndTime = getEarliestEndTime(recordings);
                     if (earliestEndTime < schedule.getEndTimeMs()) {
@@ -920,14 +912,7 @@ public class DvrScheduleManager {
                 }
             }
         }
-        List<ConflictInfo> result = new ArrayList<>(conflicts.values());
-        Collections.sort(result, new Comparator<ConflictInfo>() {
-            @Override
-            public int compare(ConflictInfo lhs, ConflictInfo rhs) {
-                return RESULT_COMPARATOR.compare(lhs.schedule, rhs.schedule);
-            }
-        });
-        return result;
+        return conflicts;
     }
 
     private static void removeFinishedRecordings(List<ScheduledRecording> recordings,
@@ -969,17 +954,6 @@ public class DvrScheduleManager {
         return earliest;
     }
 
-    @VisibleForTesting
-    static class ConflictInfo {
-        public ScheduledRecording schedule;
-        public boolean partialConflict;
-
-        ConflictInfo(ScheduledRecording schedule, boolean partialConflict) {
-            this.schedule = schedule;
-            this.partialConflict = partialConflict;
-        }
-    }
-
     /**
      * A listener which is notified the initialization of schedule manager.
      */
@@ -996,9 +970,6 @@ public class DvrScheduleManager {
     public interface OnConflictStateChangeListener {
         /**
          * Called when the conflicting schedules change.
-         * <p>
-         * Note that this can be called before
-         * {@link ScheduledRecordingListener#onScheduledRecordingAdded} is called.
          *
          * @param conflict {@code true} if the {@code schedules} are the new conflicts, otherwise
          * {@code false}.

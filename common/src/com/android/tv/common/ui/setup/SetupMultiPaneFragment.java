@@ -34,7 +34,6 @@ public abstract class SetupMultiPaneFragment extends SetupFragment {
     private static final boolean DEBUG = false;
 
     public static final int ACTION_DONE = Integer.MAX_VALUE;
-    public static final int ACTION_SKIP = ACTION_DONE - 1;
 
     private static final String CONTENT_FRAGMENT_TAG = "content_fragment";
 
@@ -54,12 +53,7 @@ public abstract class SetupMultiPaneFragment extends SetupFragment {
         }
         if (needsDoneButton()) {
             setOnClickAction(view.findViewById(R.id.button_done), getActionCategory(), ACTION_DONE);
-        }
-        if (needsSkipButton()) {
-            view.findViewById(R.id.button_skip).setVisibility(View.VISIBLE);
-            setOnClickAction(view.findViewById(R.id.button_skip), getActionCategory(), ACTION_SKIP);
-        }
-        if (!needsDoneButton() && !needsSkipButton()) {
+        } else {
             View doneButtonContainer = view.findViewById(R.id.done_button_container);
             // Use content view to check layout direction while view is being created.
             if (getResources().getConfiguration().getLayoutDirection()
@@ -94,10 +88,6 @@ public abstract class SetupMultiPaneFragment extends SetupFragment {
 
     protected boolean needsDoneButton() {
         return true;
-    }
-
-    protected boolean needsSkipButton() {
-        return false;
     }
 
     @Override

@@ -16,14 +16,11 @@
 
 package com.android.tv.menu;
 
+import android.content.Context;
 import android.support.annotation.Nullable;
 
 import com.android.tv.ChannelTuner;
-import com.android.tv.TvOptionsManager;
-import com.android.tv.TvOptionsManager.OptionChangedListener;
-import com.android.tv.TvOptionsManager.OptionType;
 import com.android.tv.data.Channel;
-import com.android.tv.menu.MenuRowFactory.TvOptionsRow;
 import com.android.tv.ui.TunableTvView;
 import com.android.tv.ui.TunableTvView.OnScreenBlockingChangedListener;
 
@@ -33,10 +30,10 @@ import com.android.tv.ui.TunableTvView.OnScreenBlockingChangedListener;
  * <p>As the menu is updated when it shows up, this class handles only the dynamic updates.
  */
 public class MenuUpdater {
-    private final Menu mMenu;
     // Can be null for testing.
-    @Nullable private final TunableTvView mTvView;
-    @Nullable private final TvOptionsManager mOptionsManager;
+    @Nullable
+    private final TunableTvView mTvView;
+    private final Menu mMenu;
     private ChannelTuner mChannelTuner;
 
     private final ChannelTuner.Listener mChannelTunerListener = new ChannelTuner.Listener() {
@@ -45,7 +42,7 @@ public class MenuUpdater {
 
         @Override
         public void onBrowsableChannelListChanged() {
-            mMenu.update(ChannelsRow.ID);
+            mMenu.update();
         }
 
         @Override
@@ -56,17 +53,10 @@ public class MenuUpdater {
             mMenu.update(ChannelsRow.ID);
         }
     };
-    private final OptionChangedListener mOptionChangeListener = new OptionChangedListener() {
-        @Override
-        public void onOptionChanged(@OptionType int optionType, String newString) {
-            mMenu.update(TvOptionsRow.ID);
-        }
-    };
 
-    public MenuUpdater(Menu menu, TunableTvView tvView, TvOptionsManager optionsManager) {
-        mMenu = menu;
+    public MenuUpdater(Context context, TunableTvView tvView, Menu menu) {
         mTvView = tvView;
-        mOptionsManager = optionsManager;
+        mMenu = menu;
         if (mTvView != null) {
             mTvView.setOnScreenBlockedListener(new OnScreenBlockingChangedListener() {
                     @Override
@@ -75,18 +65,11 @@ public class MenuUpdater {
                     }
             });
         }
-        if (mOptionsManager != null) {
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_CLOSED_CAPTIONS,
-                    mOptionChangeListener);
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_DISPLAY_MODE,
-                    mOptionChangeListener);
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_MULTI_AUDIO,
-                    mOptionChangeListener);
-        }
     }
 
     /**
-     * Sets the instance of {@link ChannelTuner}. Call this method when the channel tuner is ready.
+     * Sets the instance of {@link ChannelTuner}. Call this method when the channel tuner is ready
+     * or not available any more.
      */
     public void setChannelTuner(ChannelTuner channelTuner) {
         if (mChannelTuner != null) {
@@ -96,6 +79,7 @@ public class MenuUpdater {
         if (mChannelTuner != null) {
             mChannelTuner.addListener(mChannelTunerListener);
         }
+        mMenu.update();
     }
 
     /**
@@ -107,11 +91,6 @@ public class MenuUpdater {
         }
         if (mTvView != null) {
             mTvView.setOnScreenBlockedListener(null);
-        }
-        if (mOptionsManager != null) {
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_CLOSED_CAPTIONS, null);
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_DISPLAY_MODE, null);
-            mOptionsManager.setOptionChangedListener(TvOptionsManager.OPTION_MULTI_AUDIO, null);
         }
     }
 }

@@ -19,13 +19,13 @@ package com.android.tv.dvr.ui.list;
 import android.content.Context;
 
 import com.android.tv.data.Program;
-import com.android.tv.dvr.data.ScheduledRecording;
-import com.android.tv.dvr.data.ScheduledRecording.Builder;
+import com.android.tv.dvr.ScheduledRecording;
+import com.android.tv.dvr.ScheduledRecording.Builder;
 
 /**
  * A class for the episodic program.
  */
-class EpisodicProgramRow extends ScheduleRow {
+public class EpisodicProgramRow extends ScheduleRow {
     private final String mInputId;
     private final Program mProgram;
 

@@ -21,8 +21,8 @@ import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 
 import com.android.tv.tuner.TunerHal;
-import com.android.tv.tuner.data.Track.AtscAudioTrack;
-import com.android.tv.tuner.data.Track.AtscCaptionTrack;
+import com.android.tv.tuner.data.nano.Track.AtscAudioTrack;
+import com.android.tv.tuner.data.nano.Track.AtscCaptionTrack;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.ts.TsParser;
 import com.android.tv.tuner.data.PsiData;
@@ -51,7 +51,7 @@ public class EventDetector {
     private final SparseArray<TunerChannel> mChannelMap = new SparseArray<>();
     private final SparseBooleanArray mVctCaptionTracksFound = new SparseBooleanArray();
     private final SparseBooleanArray mEitCaptionTracksFound = new SparseBooleanArray();
-    private final List<EventListener> mEventListeners = new ArrayList<>();
+    private final EventListener mEventListener;
     private int mFrequency;
     private String mModulation;
     private int mProgramNumber = ALL_PROGRAM_NUMBERS;
@@ -105,10 +105,8 @@ public class EventDetector {
                     item.setHasCaptionTrack();
                 }
             }
-            if (tunerChannel != null && !mEventListeners.isEmpty()) {
-                for (EventListener eventListener : mEventListeners) {
-                    eventListener.onEventDetected(tunerChannel, items);
-                }
+            if (tunerChannel != null && mEventListener != null) {
+                mEventListener.onEventDetected(tunerChannel, items);
             }
         }
 
@@ -119,10 +117,8 @@ public class EventDetector {
 
         @Override
         public void onAllVctItemsParsed() {
-            if (!mEventListeners.isEmpty()) {
-                for (EventListener eventListener : mEventListeners) {
-                    eventListener.onChannelScanDone();
-                }
+            if (mEventListener != null) {
+                mEventListener.onChannelScanDone();
             }
         }
 
@@ -165,10 +161,8 @@ public class EventDetector {
             if (!found) {
                 mVctProgramNumberSet.add(channelProgramNumber);
             }
-            if (!mEventListeners.isEmpty()) {
-                for (EventListener eventListener : mEventListeners) {
-                    eventListener.onChannelDetected(tunerChannel, !found);
-                }
+            if (mEventListener != null) {
+                mEventListener.onChannelDetected(tunerChannel, !found);
             }
         }
     };
@@ -203,9 +197,11 @@ public class EventDetector {
     /**
      * Creates a detector for ATSC TV channles and program information.
      * @param usbTunerInteface {@link TunerHal}
+     * @param listener for ATSC TV channels and program information
      */
-    public EventDetector(TunerHal usbTunerInteface) {
+    public EventDetector(TunerHal usbTunerInteface, EventListener listener) {
         mTunerHal = usbTunerInteface;
+        mEventListener = listener;
     }
 
     private void reset() {
@@ -261,29 +257,5 @@ public class EventDetector {
      */
     public List<TunerChannel> getMalFormedChannels() {
         return mTsParser.getMalFormedChannels();
-    }
-
-    /**
-     * Registers an EventListener.
-     * @param eventListener the listener to be registered
-     */
-    public void registerListener(EventListener eventListener) {
-        if (mTsParser != null) {
-            // Resets the version numbers so that the new listener can receive the EIT items.
-            // Otherwise, each EIT session is handled only once unless there is a new version.
-            mTsParser.resetDataVersions();
-        }
-        mEventListeners.add(eventListener);
-    }
-
-    /**
-     * Unregisters an EventListener.
-     * @param eventListener the listener to be unregistered
-     */
-    public void unregisterListener(EventListener eventListener) {
-        boolean removed = mEventListeners.remove(eventListener);
-        if (!removed && DEBUG) {
-            Log.d(TAG, "Cannot unregister a non-registered listener!");
-        }
     }
 }

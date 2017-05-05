@@ -57,15 +57,12 @@ public final class RecurringRunner {
         mHandler = new Handler(mContext.getMainLooper());
     }
 
-    public void start(boolean restNextRunTime) {
+    public void start() {
         SoftPreconditions.checkState(!mRunning, TAG, mName + " start is called twice.");
         if (mRunning) {
             return;
         }
         mRunning = true;
-        if (restNextRunTime) {
-            resetNextRunTime();
-        }
         new AsyncTask<Void, Void, Long>() {
             @Override
             protected Long doInBackground(Void... params) {
@@ -77,10 +74,6 @@ public final class RecurringRunner {
                 postAt(nextRunTime);
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-    }
-
-    public void start() {
-        start(false);
     }
 
     public void stop() {

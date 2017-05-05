@@ -265,7 +265,9 @@ public class DataManagerSearch implements SearchInterface {
     }
 
     private String buildIntentData(long channelId) {
-        return TvContract.buildChannelUri(channelId).toString();
+        return TvContract.buildChannelUri(channelId).buildUpon()
+                .appendQueryParameter(Utils.PARAM_SOURCE, SOURCE_TV_SEARCH)
+                .build().toString();
     }
 
     private boolean isRatingBlocked(TvContentRating[] ratings) {

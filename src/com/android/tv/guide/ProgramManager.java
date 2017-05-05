@@ -29,7 +29,7 @@ import com.android.tv.data.ProgramDataManager;
 import com.android.tv.dvr.DvrDataManager;
 import com.android.tv.dvr.DvrScheduleManager;
 import com.android.tv.dvr.DvrScheduleManager.OnConflictStateChangeListener;
-import com.android.tv.dvr.data.ScheduledRecording;
+import com.android.tv.dvr.ScheduledRecording;
 import com.android.tv.util.TvInputManagerHelper;
 import com.android.tv.util.Utils;
 
@@ -439,24 +439,11 @@ public class ProgramManager {
         mChannels = mChannelDataManager.getBrowsableChannelList();
         mSelectedGenreId = GenreItems.ID_ALL_CHANNELS;
         mFilteredChannels = mChannels;
-        updateTableEntriesWithoutNotification(clearPreviousTableEntries);
-        // Channel update notification should be called after updating table entries, so that
-        // the listener can get the entries.
         notifyChannelsUpdated();
-        notifyTableEntriesUpdated();
-        buildGenreFilters();
+        updateTableEntries(clearPreviousTableEntries);
     }
 
     private void updateTableEntries(boolean clear) {
-        updateTableEntriesWithoutNotification(clear);
-        notifyTableEntriesUpdated();
-        buildGenreFilters();
-    }
-
-    /**
-     * Updates the table entries without notifying the change.
-     */
-    private void updateTableEntriesWithoutNotification(boolean clear) {
         if (clear) {
             mChannelIdEntriesMap.clear();
         }
@@ -504,6 +491,9 @@ public class ProgramManager {
                 }
             }
         }
+
+        notifyTableEntriesUpdated();
+        buildGenreFilters();
     }
 
     private void notifyGenresUpdated() {

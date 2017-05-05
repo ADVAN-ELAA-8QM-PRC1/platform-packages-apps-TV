@@ -43,7 +43,6 @@ public class SampleQueue {
         if (sampleFromQueue == null) {
             return SampleSource.NOTHING_READ;
         }
-        sample.ensureSpaceForWrite(sampleFromQueue.size);
         sample.size = sampleFromQueue.size;
         sample.flags = sampleFromQueue.flags;
         sample.timeUs = sampleFromQueue.timeUs;

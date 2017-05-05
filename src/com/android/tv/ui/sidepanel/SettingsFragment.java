@@ -16,8 +16,6 @@
 
 package com.android.tv.ui.sidepanel;
 
-import android.app.ApplicationErrorReport;
-import android.content.Intent;
 import android.view.View;
 import android.widget.Toast;
 
@@ -151,26 +149,12 @@ public class SettingsFragment extends SideFragment {
             // But, we may be able to turn on channel lock feature regardless of the permission.
             // It's TBD.
         }
-        items.add(new ActionItem(getString(R.string.settings_send_feedback)) {
-            @Override
-            protected void onSelected() {
-                Intent intent = new Intent(Intent.ACTION_APP_ERROR);
-                ApplicationErrorReport report = new ApplicationErrorReport();
-                report.packageName = report.processName = getContext().getPackageName();
-                report.time = System.currentTimeMillis();
-                report.type = ApplicationErrorReport.TYPE_NONE;
-                intent.putExtra(Intent.EXTRA_BUG_REPORT, report);
-                startActivityForResult(intent, 0);
-            }
-        });
         if (LicenseUtils.hasLicenses(activity.getAssets())) {
             items.add(new LicenseActionItem(activity));
         }
         // Show version.
-        SimpleActionItem version = new SimpleActionItem(getString(R.string.settings_menu_version),
-                ((TvApplication) activity.getApplicationContext()).getVersionName());
-        version.setClickable(false);
-        items.add(version);
+        items.add(new SimpleItem(getString(R.string.settings_menu_version),
+                ((TvApplication) activity.getApplicationContext()).getVersionName()));
         return items;
     }
 

@@ -18,7 +18,6 @@ package com.android.tv.tuner.exoplayer.ac3;
 
 import android.media.MediaFormat;
 
-import com.google.android.exoplayer.C;
 import com.google.android.exoplayer.audio.AudioTrack;
 
 import java.nio.ByteBuffer;
@@ -29,10 +28,6 @@ import java.nio.ByteBuffer;
  * This wrapper class will do nothing in disabled status for those operations.
  */
 public class AudioTrackWrapper {
-    private static final int PCM16_FRAME_BYTES = 2;
-    private static final int AC3_FRAMES_IN_ONE_SAMPLE = 1536;
-    private static final int BUFFERED_SAMPLES_IN_AUDIOTRACK =
-            Ac3DefaultTrackRenderer.BUFFERED_SAMPLES_IN_AUDIOTRACK;
     private final AudioTrack mAudioTrack = new AudioTrack();
     private int mAudioSessionID;
     private boolean mIsEnabled;
@@ -111,7 +106,7 @@ public class AudioTrackWrapper {
         mAudioTrack.setVolume(volume);
     }
 
-    public void reconfigure(MediaFormat format, int audioBufferSize) {
+    public void reconfigure(MediaFormat format) {
         if (!mIsEnabled || format == null) {
             return;
         }
@@ -122,9 +117,9 @@ public class AudioTrackWrapper {
         try {
             pcmEncoding = format.getInteger(MediaFormat.KEY_PCM_ENCODING);
         } catch (Exception e) {
-            pcmEncoding = C.ENCODING_PCM_16BIT;
+            pcmEncoding = com.google.android.exoplayer.MediaFormat.NO_VALUE;
         }
-        // TODO: Handle non-AC3.
+        // TODO: Handle non-AC3 or non-passthrough audio.
         if (MediaFormat.MIMETYPE_AUDIO_AC3.equalsIgnoreCase(mimeType) && channelCount != 2) {
             // Workarounds b/25955476.
             // Since all devices and platforms does not support passthrough for non-stereo AC3,
@@ -132,14 +127,7 @@ public class AudioTrackWrapper {
             // In other words, the channel count should be always 2.
             channelCount = 2;
         }
-        if (MediaFormat.MIMETYPE_AUDIO_RAW.equalsIgnoreCase(mimeType)) {
-            audioBufferSize =
-                    channelCount
-                            * PCM16_FRAME_BYTES
-                            * AC3_FRAMES_IN_ONE_SAMPLE
-                            * BUFFERED_SAMPLES_IN_AUDIOTRACK;
-        }
-        mAudioTrack.configure(mimeType, channelCount, sampleRate, pcmEncoding, audioBufferSize);
+        mAudioTrack.configure(mimeType, channelCount, sampleRate, pcmEncoding);
     }
 
     public void handleDiscontinuity() {

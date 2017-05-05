@@ -17,7 +17,6 @@
 package com.android.tv.dvr.ui;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v17.leanback.widget.GuidanceStylist.Guidance;
@@ -25,67 +24,19 @@ import android.support.v17.leanback.widget.GuidedAction;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
-import com.android.tv.common.SoftPreconditions;
-import com.android.tv.dvr.ui.browse.DvrBrowseActivity;
+import com.android.tv.dvr.DvrDataManager;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class DvrInsufficientSpaceErrorFragment extends DvrGuidedStepFragment {
-    /**
-     * Key for the failed scheduled recordings information.
-     */
-    public static final String FAILED_SCHEDULED_RECORDING_INFOS =
-            "failed_scheduled_recording_infos";
-
-    private static final String TAG = "DvrInsufficientSpaceErrorFragment";
-
-    private static final int ACTION_VIEW_RECENT_RECORDINGS = 1;
-
-    private ArrayList<String> mFailedScheduledRecordingInfos;
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        Bundle args = getArguments();
-        if (args != null) {
-            mFailedScheduledRecordingInfos =
-                    args.getStringArrayList(FAILED_SCHEDULED_RECORDING_INFOS);
-        }
-        SoftPreconditions.checkState(
-                mFailedScheduledRecordingInfos != null && !mFailedScheduledRecordingInfos.isEmpty(),
-                TAG, "failed scheduled recording is null");
-    }
+    private static final int ACTION_DONE = 1;
+    private static final int ACTION_OPEN_DVR = 2;
 
     @Override
     public Guidance onCreateGuidance(Bundle savedInstanceState) {
-        String title;
-        String description;
-        int failedScheduledRecordingSize = mFailedScheduledRecordingInfos.size();
-        if (failedScheduledRecordingSize == 1) {
-            title =  getString(
-                    R.string.dvr_error_insufficient_space_title_one_recording,
-                    mFailedScheduledRecordingInfos.get(0));
-            description = getString(
-                    R.string.dvr_error_insufficient_space_description_one_recording,
-                    mFailedScheduledRecordingInfos.get(0));
-        } else if (failedScheduledRecordingSize == 2) {
-            title =  getString(
-                    R.string.dvr_error_insufficient_space_title_two_recordings,
-                    mFailedScheduledRecordingInfos.get(0), mFailedScheduledRecordingInfos.get(1));
-            description = getString(
-                    R.string.dvr_error_insufficient_space_description_two_recordings,
-                    mFailedScheduledRecordingInfos.get(0), mFailedScheduledRecordingInfos.get(1));
-        } else {
-            title =  getString(
-                    R.string.dvr_error_insufficient_space_title_three_or_more_recordings,
-                    mFailedScheduledRecordingInfos.get(0), mFailedScheduledRecordingInfos.get(1),
-                    mFailedScheduledRecordingInfos.get(2));
-            description = getString(
-                    R.string.dvr_error_insufficient_space_description_three_or_more_recordings,
-                    mFailedScheduledRecordingInfos.get(0), mFailedScheduledRecordingInfos.get(1),
-                    mFailedScheduledRecordingInfos.get(2));
-        }
+        String title = getResources().getString(R.string.dvr_error_insufficient_space_title);
+        String description = getResources()
+                .getString(R.string.dvr_error_insufficient_space_description);
         return new Guidance(title, description, null, null);
     }
 
@@ -93,21 +44,26 @@ public class DvrInsufficientSpaceErrorFragment extends DvrGuidedStepFragment {
     public void onCreateActions(List<GuidedAction> actions, Bundle savedInstanceState) {
         Activity activity = getActivity();
         actions.add(new GuidedAction.Builder(activity)
-                .clickAction(GuidedAction.ACTION_ID_OK)
+                .id(ACTION_DONE)
+                .title(getResources().getString(R.string.dvr_action_error_done))
                 .build());
-        if (TvApplication.getSingletons(getContext()).getDvrManager().hasValidItems()) {
-            actions.add(new GuidedAction.Builder(activity)
-                    .id(ACTION_VIEW_RECENT_RECORDINGS)
-                    .title(getResources().getString(
-                            R.string.dvr_error_insufficient_space_action_view_recent_recordings))
-                    .build());
+        DvrDataManager dvrDataManager = TvApplication.getSingletons(getContext())
+                .getDvrDataManager();
+        if (!(dvrDataManager.getRecordedPrograms().isEmpty()
+                && dvrDataManager.getStartedRecordings().isEmpty()
+                && dvrDataManager.getNonStartedScheduledRecordings().isEmpty()
+                && dvrDataManager.getSeriesRecordings().isEmpty())) {
+                    actions.add(new GuidedAction.Builder(activity)
+                            .id(ACTION_OPEN_DVR)
+                            .title(getResources().getString(R.string.dvr_action_error_open_dvr))
+                            .build());
         }
     }
 
     @Override
     public void onGuidedActionClicked(GuidedAction action) {
-        if (action.getId() == ACTION_VIEW_RECENT_RECORDINGS) {
-            Intent intent = new Intent(getActivity(), DvrBrowseActivity.class);
+        if (action.getId() == ACTION_OPEN_DVR) {
+            Intent intent = new Intent(getActivity(), DvrActivity.class);
             getActivity().startActivity(intent);
         }
         dismissDialog();

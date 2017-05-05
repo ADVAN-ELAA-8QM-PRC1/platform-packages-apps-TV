@@ -114,7 +114,7 @@ public class SetupUtils {
                 @Override
                 public void onLoadFinished() {
                     manager.removeListener(this);
-                    updateChannelsAfterSetup(mTvApplication, inputId, postRunnable);
+                    updateChannelBrowsable(mTvApplication, inputId, postRunnable);
                 }
 
                 @Override
@@ -124,18 +124,17 @@ public class SetupUtils {
                 public void onChannelBrowsableChanged() { }
             });
         } else {
-            updateChannelsAfterSetup(mTvApplication, inputId, postRunnable);
+            updateChannelBrowsable(mTvApplication, inputId, postRunnable);
         }
     }
 
-    private static void updateChannelsAfterSetup(Context context, final String inputId,
+    private static void updateChannelBrowsable(Context context, final String inputId,
             final Runnable postRunnable) {
         ApplicationSingletons appSingletons = TvApplication.getSingletons(context);
         final ChannelDataManager manager = appSingletons.getChannelDataManager();
         manager.updateChannels(new Runnable() {
             @Override
             public void run() {
-                Channel firstChannelForInput = null;
                 boolean browsableChanged = false;
                 for (Channel channel : manager.getChannelList()) {
                     if (channel.getInputId().equals(inputId)) {
@@ -143,13 +142,7 @@ public class SetupUtils {
                             manager.updateBrowsable(channel.getId(), true, true);
                             browsableChanged = true;
                         }
-                        if (firstChannelForInput == null) {
-                            firstChannelForInput = channel;
-                        }
                     }
-                }
-                if (firstChannelForInput != null) {
-                    Utils.setLastWatchedChannel(context, firstChannelForInput);
                 }
                 if (browsableChanged) {
                     manager.notifyChannelBrowsableChanged();
@@ -392,7 +385,10 @@ public class SetupUtils {
         // Start fetching program guide data for internal tuners.
         Context context = mTvApplication.getApplicationContext();
         if (Utils.isInternalTvInput(context, inputId)) {
-            EpgFetcher.getInstance(context).startImmediately(true);
+            if (context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED && Experiments.CLOUD_EPG.get()) {
+                EpgFetcher.getInstance(context).startImmediately();
+            }
         }
     }
 }

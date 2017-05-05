@@ -102,7 +102,6 @@ public class TsParser {
         }
 
         protected abstract void handleData(byte[] data, boolean startIndicator);
-        protected abstract void resetDataVersions();
     }
 
     private class SectionStream extends Stream {
@@ -137,11 +136,6 @@ public class TsParser {
             }
             mPacket.append(data, startPos, data.length - startPos);
             mSectionParser.parseSections(mPacket);
-        }
-
-        @Override
-        protected void resetDataVersions() {
-            mSectionParser.resetVersionNumbers();
         }
 
         private final OutputListener mSectionListener = new OutputListener() {
@@ -456,17 +450,5 @@ public class TsParser {
             }
         }
         return incompleteChannels;
-    }
-
-    /**
-     * Reset the versions so that data with old version number can be handled.
-     */
-    public void resetDataVersions() {
-        for (int eitPid : mEITPids) {
-            Stream stream = mStreamMap.get(eitPid);
-            if (stream != null) {
-                stream.resetDataVersions();
-            }
-        }
     }
 }

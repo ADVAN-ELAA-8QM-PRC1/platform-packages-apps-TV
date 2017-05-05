@@ -17,23 +17,20 @@
 package com.android.tv.tuner.exoplayer.buffer;
 
 import android.content.Context;
+import android.media.MediaFormat;
 import android.os.AsyncTask;
+import android.os.Looper;
 import android.provider.Settings;
-import android.support.annotation.NonNull;
 import android.util.Pair;
-
-import com.android.tv.common.SoftPreconditions;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.SortedMap;
 
 /**
  * Manages Trickplay storage.
  */
 public class TrickplayStorageManager implements BufferManager.StorageManager {
-    // TODO: Support multi-sessions.
     private static final String BUFFER_DIR = "timeshift";
 
     // Copied from android.provider.Settings.Global (hidden fields)
@@ -46,68 +43,53 @@ public class TrickplayStorageManager implements BufferManager.StorageManager {
     private static final int DEFAULT_THRESHOLD_PERCENTAGE = 10;
     private static final long DEFAULT_THRESHOLD_MAX_BYTES = 500L * 1024 * 1024;
 
-    private static AsyncTask<Void, Void, Void> sLastCacheCleanUpTask;
-    private static File sBufferDir;
-    private static long sStorageBufferBytes;
-
+    private final File mBufferDir;
     private final long mMaxBufferSize;
+    private final long mStorageBufferBytes;
 
-    private static void initParamsIfNeeded(Context context, @NonNull File path) {
-        // TODO: Support multi-sessions.
-        SoftPreconditions.checkState(
-                sBufferDir == null || sBufferDir.equals(path));
-        if (path.equals(sBufferDir)) {
-            return;
-        }
-        sBufferDir = path;
+    private static long getStorageBufferBytes(Context context, File path) {
         long lowPercentage = Settings.Global.getInt(context.getContentResolver(),
                 SYS_STORAGE_THRESHOLD_PERCENTAGE, DEFAULT_THRESHOLD_PERCENTAGE);
-        long lowPercentageToBytes = path.getTotalSpace() * lowPercentage / 100;
+        long lowBytes = path.getTotalSpace() * lowPercentage / 100;
         long maxLowBytes = Settings.Global.getLong(context.getContentResolver(),
                 SYS_STORAGE_THRESHOLD_MAX_BYTES, DEFAULT_THRESHOLD_MAX_BYTES);
-        sStorageBufferBytes = Math.min(lowPercentageToBytes, maxLowBytes);
+        return Math.min(lowBytes, maxLowBytes);
     }
 
-    public TrickplayStorageManager(Context context, @NonNull File baseDir, long maxBufferSize) {
-        initParamsIfNeeded(context, new File(baseDir, BUFFER_DIR));
-        sBufferDir.mkdirs();
+    public TrickplayStorageManager(Context context, File baseDir, long maxBufferSize) {
+        mBufferDir = new File(baseDir, BUFFER_DIR);
+        mBufferDir.mkdirs();
         mMaxBufferSize = maxBufferSize;
         clearStorage();
+        mStorageBufferBytes = getStorageBufferBytes(context, mBufferDir);
     }
 
-    private void clearStorage() {
-        long now = System.currentTimeMillis();
-        if (sLastCacheCleanUpTask != null) {
-            sLastCacheCleanUpTask.cancel(true);
+    @Override
+    public void clearStorage() {
+        File files[] = mBufferDir.listFiles();
+        if (files == null || files.length == 0) {
+            return;
         }
-        sLastCacheCleanUpTask = new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... params) {
-                if (isCancelled()) {
-                    return null;
-                }
-                File files[] = sBufferDir.listFiles();
-                if (files == null || files.length == 0) {
-                    return null;
-                }
-                for (File file : files) {
-                    if (isCancelled()) {
-                        break;
-                    }
-                    long lastModified = file.lastModified();
-                    if (lastModified != 0 && lastModified < now) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            new AsyncTask<Void, Void, Void>() {
+                @Override
+                protected Void doInBackground(Void... params) {
+                    for (File file : files) {
                         file.delete();
                     }
+                    return null;
                 }
-                return null;
+            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        } else {
+            for (File file : files) {
+                file.delete();
             }
-        };
-        sLastCacheCleanUpTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        }
     }
 
     @Override
     public File getBufferDir() {
-        return sBufferDir;
+        return mBufferDir;
     }
 
     @Override
@@ -122,26 +104,25 @@ public class TrickplayStorageManager implements BufferManager.StorageManager {
 
     @Override
     public boolean hasEnoughBuffer(long pendingDelete) {
-        return sBufferDir.getUsableSpace() + pendingDelete >= sStorageBufferBytes;
+        return mBufferDir.getUsableSpace() + pendingDelete >= mStorageBufferBytes;
     }
 
     @Override
-    public List<BufferManager.TrackFormat> readTrackInfoFiles(boolean isAudio) {
+    public Pair<String, MediaFormat> readTrackInfoFile(boolean isAudio) {
         return null;
     }
 
     @Override
-    public ArrayList<BufferManager.PositionHolder> readIndexFile(String trackId) {
+    public ArrayList<Long> readIndexFile(String trackId) {
         return null;
     }
 
     @Override
-    public void writeTrackInfoFiles(List<BufferManager.TrackFormat> formatList, boolean isAudio) {
+    public void writeTrackInfoFile(String trackId, MediaFormat format, boolean isAudio) {
     }
 
     @Override
-    public void writeIndexFile(String trackName,
-            SortedMap<Long, Pair<SampleChunk, Integer>> index) {
+    public void writeIndexFile(String trackName, SortedMap<Long, SampleChunk> index) {
     }
 
 }

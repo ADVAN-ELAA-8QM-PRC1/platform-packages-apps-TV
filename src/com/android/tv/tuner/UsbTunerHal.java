@@ -169,10 +169,6 @@ public class UsbTunerHal extends TunerHal {
     * Gets the number of USB tuner devices currently present.
     */
     public static int getNumberOfDevices(Context context) {
-        try {
-            return (new DvbDeviceAccessor(context)).getNumOfDvbDevices();
-        } catch (Exception e) {
-            return 0;
-        }
+        return (new DvbDeviceAccessor(context)).getNumOfDvbDevices();
     }
 }

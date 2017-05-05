@@ -22,6 +22,9 @@ import android.support.v17.leanback.app.GuidedStepFragment;
 
 import com.android.tv.R;
 import com.android.tv.TvApplication;
+import com.android.tv.common.SoftPreconditions;
+import com.android.tv.dvr.ui.SeriesDeletionFragment;
+import com.android.tv.ui.sidepanel.SettingsFragment;
 
 /**
  * Activity to show details view in DVR.
@@ -39,7 +42,7 @@ public class DvrSeriesDeletionActivity extends Activity {
         setContentView(R.layout.activity_dvr_series_settings);
         // Check savedInstanceState to prevent that activity is being showed with animation.
         if (savedInstanceState == null) {
-            DvrSeriesDeletionFragment deletionFragment = new DvrSeriesDeletionFragment();
+            SeriesDeletionFragment deletionFragment = new SeriesDeletionFragment();
             deletionFragment.setArguments(getIntent().getExtras());
             GuidedStepFragment.addAsRoot(this, deletionFragment, R.id.dvr_settings_view_frame);
         }

@@ -42,7 +42,6 @@ class TunerTsStreamerManager {
     private final Object mCancelLock = new Object();
     private final StreamerFinder mStreamerFinder = new StreamerFinder();
     private final Map<Integer, TsStreamerCreator> mCreators = new HashMap<>();
-    private final Map<Integer, EventDetector.EventListener> mListeners = new HashMap<>();
     private final Map<TsDataSource, TunerTsStreamer> mSourceToStreamerMap = new HashMap<>();
     private final TunerHalManager mTunerHalManager = new TunerHalManager();
     private static TunerTsStreamerManager sInstance;
@@ -69,8 +68,6 @@ class TunerTsStreamerManager {
                 mStreamerFinder.appendSessionLocked(channel, sessionId);
                 TunerTsStreamer streamer =  mStreamerFinder.getStreamerLocked(channel);
                 TsDataSource source = streamer.createDataSource();
-                mListeners.put(sessionId, listener);
-                streamer.registerListener(listener);
                 mSourceToStreamerMap.put(source, streamer);
                 return source;
             }
@@ -86,8 +83,6 @@ class TunerTsStreamerManager {
             if (!creator.isCancelledLocked()) {
                 mStreamerFinder.putLocked(channel, sessionId, streamer);
                 TsDataSource source = streamer.createDataSource();
-                mListeners.put(sessionId, listener);
-                streamer.registerListener(listener);
                 mSourceToStreamerMap.put(source, streamer);
                 return source;
             }
@@ -109,8 +104,6 @@ class TunerTsStreamerManager {
             if (streamer == null) {
                 return;
             }
-            EventDetector.EventListener listener = mListeners.remove(sessionId);
-            streamer.unregisterListener(listener);
             TunerChannel channel = streamer.getChannel();
             SoftPreconditions.checkState(channel != null);
             mStreamerFinder.removeSessionLocked(channel, sessionId);
@@ -130,13 +123,6 @@ class TunerTsStreamerManager {
                mCreators.get(sessionId).cancelLocked();
            }
         }
-    }
-
-    /**
-     * Add tuner hal into TunerHalManager for test.
-     */
-    void addTunerHal(TunerHal tunerHal, int sessionId) {
-        mTunerHalManager.addTunerHal(tunerHal, sessionId);
     }
 
     synchronized void release(int sessionId) {
@@ -275,16 +261,16 @@ class TunerTsStreamerManager {
         }
 
         private void releaseTunerHal(TunerHal hal, int sessionId, boolean reuse) {
-            if (!reuse || !hal.isReusable()) {
+            if (!reuse) {
                 AutoCloseableUtils.closeQuietly(hal);
                 return;
             }
             TunerHal cachedHal = mTunerHals.get(sessionId);
             if (cachedHal != hal) {
                 mTunerHals.put(sessionId, hal);
-                if (cachedHal != null) {
-                    AutoCloseableUtils.closeQuietly(cachedHal);
-                }
+            }
+            if (cachedHal != null && cachedHal != hal) {
+                AutoCloseableUtils.closeQuietly(cachedHal);
             }
         }
 
@@ -296,10 +282,6 @@ class TunerTsStreamerManager {
             if (hal != null) {
                 AutoCloseableUtils.closeQuietly(hal);
             }
-        }
-
-        private void addTunerHal(TunerHal tunerHal, int sessionId) {
-            mTunerHals.put(sessionId, tunerHal);
         }
     }
 }

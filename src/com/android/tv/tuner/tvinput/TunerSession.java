@@ -41,7 +41,7 @@ import com.android.tv.tuner.R;
 import com.android.tv.tuner.cc.CaptionLayout;
 import com.android.tv.tuner.cc.CaptionTrackRenderer;
 import com.android.tv.tuner.data.Cea708Data.CaptionEvent;
-import com.android.tv.tuner.data.Track.AtscCaptionTrack;
+import com.android.tv.tuner.data.nano.Track.AtscCaptionTrack;
 import com.android.tv.tuner.exoplayer.buffer.BufferManager;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.util.GlobalSettingsUtils;
@@ -81,7 +81,8 @@ public class TunerSession extends TvInputService.Session implements Handler.Call
     private boolean mPlayPaused;
     private long mTuneStartTimestamp;
 
-    public TunerSession(Context context, ChannelDataManager channelDataManager) {
+    public TunerSession(Context context, ChannelDataManager channelDataManager,
+            BufferManager bufferManager) {
         super(context);
         mContext = context;
         mUiHandler = new Handler(this);
@@ -96,9 +97,12 @@ public class TunerSession extends TvInputService.Session implements Handler.Call
         mStatusView.setVisibility(showDebug ? View.VISIBLE : View.INVISIBLE);
         mAudioStatusView = (TextView) mOverlayView.findViewById(R.id.audio_status);
         mAudioStatusView.setVisibility(View.INVISIBLE);
+        mAudioStatusView.setText(Html.fromHtml(StatusTextUtils.getAudioWarningInHTML(
+                context.getString(R.string.ut_surround_sound_disabled))));
         CaptionLayout captionLayout = (CaptionLayout) mOverlayView.findViewById(R.id.caption);
         mCaptionTrackRenderer = new CaptionTrackRenderer(captionLayout);
-        mSessionWorker = new TunerSessionWorker(context, channelDataManager, this);
+        mSessionWorker = new TunerSessionWorker(context, channelDataManager,
+                bufferManager, this);
     }
 
     public boolean isReleased() {
@@ -268,13 +272,10 @@ public class TunerSession extends TvInputService.Session implements Handler.Call
                 // setting is "never".
                 final int value = GlobalSettingsUtils.getEncodedSurroundOutputSettings(mContext);
                 if (value == GlobalSettingsUtils.ENCODED_SURROUND_OUTPUT_NEVER) {
-                    mAudioStatusView.setText(Html.fromHtml(StatusTextUtils.getAudioWarningInHTML(
-                            mContext.getString(R.string.ut_surround_sound_disabled))));
+                    mAudioStatusView.setVisibility(View.VISIBLE);
                 } else {
-                    mAudioStatusView.setText(Html.fromHtml(StatusTextUtils.getAudioWarningInHTML(
-                            mContext.getString(R.string.audio_passthrough_not_supported))));
+                    Log.e(TAG, "Audio is unavailable, surround sound setting is " + value);
                 }
-                mAudioStatusView.setVisibility(View.VISIBLE);
                 return true;
             }
             case MSG_UI_HIDE_AUDIO_UNPLAYABLE: {

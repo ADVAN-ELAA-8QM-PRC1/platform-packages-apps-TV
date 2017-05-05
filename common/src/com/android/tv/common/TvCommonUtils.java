@@ -23,8 +23,6 @@ import android.media.tv.TvInputInfo;
  * Util class for common use in TV app and inputs.
  */
 public final class TvCommonUtils {
-    private static Boolean sRunningInTest;
-
     private TvCommonUtils() { }
 
     /**
@@ -60,15 +58,12 @@ public final class TvCommonUtils {
      * the usual devices even the application is running in tests. We need to figure it out by
      * checking whether the class in tv-tests-common module can be loaded or not.
      */
-    public static synchronized boolean isRunningInTest() {
-        if (sRunningInTest == null) {
-            try {
-                Class.forName("com.android.tv.testing.Utils");
-                sRunningInTest = true;
-            } catch (ClassNotFoundException e) {
-                sRunningInTest = false;
-            }
+    public static boolean isRunningInTest() {
+        try {
+            Class.forName("com.android.tv.testing.Utils");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
         }
-        return sRunningInTest;
     }
 }

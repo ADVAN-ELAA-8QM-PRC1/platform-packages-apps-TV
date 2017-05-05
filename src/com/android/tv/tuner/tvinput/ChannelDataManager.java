@@ -30,7 +30,6 @@ import android.os.HandlerThread;
 import android.os.Message;
 import android.os.RemoteException;
 import android.support.annotation.Nullable;
-import android.support.v4.os.BuildCompat;
 import android.text.format.DateUtils;
 import android.util.Log;
 
@@ -38,7 +37,6 @@ import com.android.tv.tuner.TunerPreferences;
 import com.android.tv.tuner.data.PsipData.EitItem;
 import com.android.tv.tuner.data.TunerChannel;
 import com.android.tv.tuner.util.ConvertUtils;
-import com.android.tv.util.PermissionUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -194,14 +192,11 @@ public class ChannelDataManager implements Handler.Callback {
 
     public void release() {
         mHandler.removeCallbacksAndMessages(null);
-        releaseSafely();
+        mHandlerThread.quitSafely();
     }
 
     public void releaseSafely() {
         mHandlerThread.quitSafely();
-        mListener = null;
-        mChannelScanListener = null;
-        mChannelScanHandler = null;
     }
 
     public TunerChannel getChannel(long channelId) {
@@ -440,7 +435,7 @@ public class ChannelDataManager implements Handler.Callback {
                     }
                 }
                 ops.add(buildContentProviderOperation(ContentProviderOperation.newInsert(
-                        TvContract.Programs.CONTENT_URI), newItem, channel));
+                        TvContract.Programs.CONTENT_URI), newItem, channel.getChannelId()));
                 if (ops.size() >= BATCH_OPERATION_COUNT) {
                     applyBatch(channel.getName(), ops);
                     ops.clear();
@@ -510,7 +505,7 @@ public class ChannelDataManager implements Handler.Callback {
                 continue;
             }
             ops.add(buildContentProviderOperation(ContentProviderOperation.newInsert(
-                    TvContract.Programs.CONTENT_URI), item, channel));
+                    TvContract.Programs.CONTENT_URI), item, channel.getChannelId()));
             if (ops.size() >= BATCH_OPERATION_COUNT) {
                 applyBatch(channel.getName(), ops);
                 ops.clear();
@@ -521,13 +516,9 @@ public class ChannelDataManager implements Handler.Callback {
     }
 
     private ContentProviderOperation buildContentProviderOperation(
-            ContentProviderOperation.Builder builder, EitItem item, TunerChannel channel) {
-        if (channel != null) {
-            builder.withValue(TvContract.Programs.COLUMN_CHANNEL_ID, channel.getChannelId());
-            if (BuildCompat.isAtLeastN()) {
-                builder.withValue(TvContract.Programs.COLUMN_RECORDING_PROHIBITED,
-                        channel.isRecordingProhibited() ? 1 : 0);
-            }
+            ContentProviderOperation.Builder builder, EitItem item, Long channelId) {
+        if (channelId != null) {
+            builder.withValue(TvContract.Programs.COLUMN_CHANNEL_ID, channelId);
         }
         if (item != null) {
             builder.withValue(TvContract.Programs.COLUMN_TITLE, item.getTitleText())
@@ -565,10 +556,7 @@ public class ChannelDataManager implements Handler.Callback {
         values.put(TvContract.Channels.COLUMN_DISPLAY_NAME, channel.getName());
         values.put(TvContract.Channels.COLUMN_INTERNAL_PROVIDER_DATA, channel.toByteArray());
         values.put(TvContract.Channels.COLUMN_DESCRIPTION, channel.getDescription());
-        values.put(TvContract.Channels.COLUMN_VIDEO_FORMAT, channel.getVideoFormat());
         values.put(TvContract.Channels.COLUMN_INTERNAL_PROVIDER_FLAG1, VERSION);
-        values.put(TvContract.Channels.COLUMN_INTERNAL_PROVIDER_FLAG2,
-                channel.isRecordingProhibited() ? 1 : 0);
 
         if (channelId <= 0) {
             values.put(TvContract.Channels.COLUMN_INPUT_ID, mInputId);
@@ -610,29 +598,13 @@ public class ChannelDataManager implements Handler.Callback {
     }
 
     private void checkVersion() {
-        if (PermissionUtils.hasAccessAllEpg(mContext)) {
-            String selection = TvContract.Channels.COLUMN_INTERNAL_PROVIDER_FLAG1 + "<>?";
-            try (Cursor cursor = mContext.getContentResolver().query(mChannelsUri,
-                    CHANNEL_DATA_SELECTION_ARGS, selection,
-                    new String[] {Integer.toString(VERSION)}, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    // The stored channel data seem outdated. Delete them all.
-                    clearChannels();
-                }
-            }
-        } else {
-            try (Cursor cursor = mContext.getContentResolver().query(mChannelsUri,
-                    new String[] { TvContract.Channels.COLUMN_INTERNAL_PROVIDER_FLAG1 },
-                    null, null, null)) {
-                if (cursor != null) {
-                    while (cursor.moveToNext()) {
-                        int version = cursor.getInt(0);
-                        if (version != VERSION) {
-                            clearChannels();
-                            break;
-                        }
-                    }
-                }
+        String selection = TvContract.Channels.COLUMN_INTERNAL_PROVIDER_FLAG1 + "<>?";
+        try (Cursor cursor = mContext.getContentResolver().query(mChannelsUri,
+                CHANNEL_DATA_SELECTION_ARGS, selection,
+                new String[] {Integer.toString(VERSION)}, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                // The stored channel data seem outdated. Delete them all.
+                clearChannels();
             }
         }
     }

@@ -39,8 +39,8 @@ import com.android.tv.common.SoftPreconditions;
 import com.android.tv.tuner.data.Cea708Data;
 import com.android.tv.tuner.data.Cea708Data.CaptionEvent;
 import com.android.tv.tuner.data.TunerChannel;
-import com.android.tv.tuner.exoplayer.ac3.Ac3DefaultTrackRenderer;
-import com.android.tv.tuner.exoplayer.ac3.Ac3MediaCodecTrackRenderer;
+import com.android.tv.tuner.exoplayer.ac3.Ac3PassthroughTrackRenderer;
+import com.android.tv.tuner.exoplayer.ac3.Ac3TrackRenderer;
 import com.android.tv.tuner.source.TsDataSource;
 import com.android.tv.tuner.source.TsDataSourceManager;
 import com.android.tv.tuner.tvinput.EventDetector;
@@ -48,12 +48,11 @@ import com.android.tv.tuner.tvinput.EventDetector;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-/** MPEG-2 TS stream player implementation using ExoPlayer. */
-public class MpegTsPlayer
-        implements ExoPlayer.Listener,
-                MediaCodecVideoTrackRenderer.EventListener,
-                Ac3DefaultTrackRenderer.EventListener,
-                Ac3MediaCodecTrackRenderer.Ac3EventListener {
+/**
+ * MPEG-2 TS stream player implementation using ExoPlayer.
+ */
+public class MpegTsPlayer implements ExoPlayer.Listener, MediaCodecVideoTrackRenderer.EventListener,
+        Ac3PassthroughTrackRenderer.EventListener, Ac3TrackRenderer.Ac3EventListener {
     private int mCaptionServiceNumber = Cea708Data.EMPTY_SERVICE_NUMBER;
 
     /**
@@ -305,10 +304,8 @@ public class MpegTsPlayer
         SoftPreconditions.checkState(supportSmoothTrickPlay(playbackParams.getSpeed()));
         mPlayer.setPlayWhenReady(true);
         mTrickplayRunning = true;
-        if (mAudioRenderer instanceof Ac3DefaultTrackRenderer) {
-            mPlayer.sendMessage(
-                    mAudioRenderer,
-                    Ac3DefaultTrackRenderer.MSG_SET_PLAYBACK_SPEED,
+        if (mAudioRenderer instanceof Ac3PassthroughTrackRenderer) {
+            mPlayer.sendMessage(mAudioRenderer, Ac3PassthroughTrackRenderer.MSG_SET_PLAYBACK_SPEED,
                     playbackParams.getSpeed());
         } else {
             mPlayer.sendMessage(mAudioRenderer,
@@ -320,9 +317,10 @@ public class MpegTsPlayer
     private void stopSmoothTrickplay(boolean calledBySeek) {
         if (mTrickplayRunning) {
             mTrickplayRunning = false;
-            if (mAudioRenderer instanceof Ac3DefaultTrackRenderer) {
-                mPlayer.sendMessage(
-                        mAudioRenderer, Ac3DefaultTrackRenderer.MSG_SET_PLAYBACK_SPEED, 1.0f);
+            if (mAudioRenderer instanceof Ac3PassthroughTrackRenderer) {
+                mPlayer.sendMessage(mAudioRenderer,
+                        Ac3PassthroughTrackRenderer.MSG_SET_PLAYBACK_SPEED,
+                        1.0f);
             } else {
                 mPlayer.sendMessage(mAudioRenderer,
                         MediaCodecAudioTrackRenderer.MSG_SET_PLAYBACK_PARAMS,
@@ -425,8 +423,8 @@ public class MpegTsPlayer
      */
     public void setVolume(float volume) {
         mVolume = volume;
-        if (mAudioRenderer instanceof Ac3DefaultTrackRenderer) {
-            mPlayer.sendMessage(mAudioRenderer, Ac3DefaultTrackRenderer.MSG_SET_VOLUME, volume);
+        if (mAudioRenderer instanceof Ac3PassthroughTrackRenderer) {
+            mPlayer.sendMessage(mAudioRenderer, Ac3PassthroughTrackRenderer.MSG_SET_VOLUME, volume);
         } else {
             mPlayer.sendMessage(mAudioRenderer, MediaCodecAudioTrackRenderer.MSG_SET_VOLUME,
                     volume);
@@ -439,9 +437,9 @@ public class MpegTsPlayer
      * @param enable enables the audio when {@code true}, disables otherwise.
      */
     public void setAudioTrack(boolean enable) {
-        if (mAudioRenderer instanceof Ac3DefaultTrackRenderer) {
-            mPlayer.sendMessage(
-                    mAudioRenderer, Ac3DefaultTrackRenderer.MSG_SET_AUDIO_TRACK, enable ? 1 : 0);
+        if (mAudioRenderer instanceof Ac3PassthroughTrackRenderer) {
+            mPlayer.sendMessage(mAudioRenderer, Ac3PassthroughTrackRenderer.MSG_SET_AUDIO_TRACK,
+                    enable ? 1 : 0);
         } else {
             mPlayer.sendMessage(mAudioRenderer, MediaCodecAudioTrackRenderer.MSG_SET_VOLUME,
                     enable ? mVolume : 0.0f);
@@ -494,28 +492,6 @@ public class MpegTsPlayer
             return;
         }
         mPlayer.setSelectedTrack(rendererIndex, trackIndex);
-    }
-
-    /**
-     * Returns the index of the currently selected track for the specified renderer.
-     *
-     * @param rendererIndex The index of the renderer.
-     * @return The selected track. A negative value or a value greater than or equal to the renderer's
-     *     track count indicates that the renderer is disabled.
-     */
-    public int getSelectedTrack(int rendererIndex) {
-        return mPlayer.getSelectedTrack(rendererIndex);
-    }
-
-    /**
-     * Returns the format of a track.
-     *
-     * @param rendererIndex The index of the renderer.
-     * @param trackIndex The index of the track.
-     * @return The format of the track.
-     */
-    public MediaFormat getTrackFormat(int rendererIndex, int trackIndex) {
-        return mPlayer.getTrackFormat(rendererIndex, trackIndex);
     }
 
     /**

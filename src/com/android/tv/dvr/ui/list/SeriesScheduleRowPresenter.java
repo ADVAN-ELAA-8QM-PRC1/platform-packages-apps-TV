@@ -22,13 +22,13 @@ import android.view.ViewGroup;
 
 import com.android.tv.R;
 import com.android.tv.common.SoftPreconditions;
-import com.android.tv.dvr.ui.DvrUiHelper;
+import com.android.tv.dvr.DvrUiHelper;
 import com.android.tv.util.Utils;
 
 /**
  * A RowPresenter for series schedule row.
  */
-class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
+public class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
     private static final String TAG = "SeriesRowPresenter";
 
     private boolean mLtr;
@@ -74,8 +74,13 @@ class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
             viewHolder.getProgramTitleView().setCompoundDrawablePadding(getContext()
                     .getResources().getDimensionPixelOffset(
                             R.dimen.dvr_schedules_warning_icon_padding));
-            viewHolder.getProgramTitleView().setCompoundDrawablesRelativeWithIntrinsicBounds(
-                    R.drawable.ic_warning_gray600_36dp, 0, 0, 0);
+            if (mLtr) {
+                viewHolder.getProgramTitleView().setCompoundDrawablesWithIntrinsicBounds(
+                        R.drawable.ic_warning_gray600_36dp, 0, 0, 0);
+            } else {
+                viewHolder.getProgramTitleView().setCompoundDrawablesWithIntrinsicBounds(
+                        0, 0, R.drawable.ic_warning_gray600_36dp, 0);
+            }
         } else {
             viewHolder.getProgramTitleView().setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
         }
@@ -83,7 +88,9 @@ class SeriesScheduleRowPresenter extends ScheduleRowPresenter {
 
     @Override
     protected void onInfoClicked(ScheduleRow row) {
-        DvrUiHelper.startSchedulesActivity(getContext(), row.getSchedule());
+        if (row.getSchedule() != null) {
+            DvrUiHelper.startSchedulesActivity(getContext(), row.getSchedule());
+        }
     }
 
     @Override
